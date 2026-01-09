@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Hyprshot
+Comment=Lightweight screenshot and annotation tool for Hyprland
+Exec=hyprshot
+Terminal=false
+Type=Application
+Icon=hyprshot
+Categories=Graphics;Utility;
+Keywords=screenshot;hyprland;wayland;

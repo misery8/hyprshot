@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/io/github/misery8/hyprshot">
+    <file compressed="true" preprocess="xml-stripblanks">icons/symbolic/palette-symbolic.svg</file>
+    <file compressed="true" preprocess="xml-stripblanks">icons/symbolic/diagonal-arrow-symbolic.svg</file>
+    <file compressed="true" preprocess="xml-stripblanks">icons/symbolic/rectangle-symbolic.svg</file>
+    <file compressed="true" preprocess="xml-stripblanks">icons/symbolic/drop-water-symbolic.svg</file>
+    <file compressed="true" preprocess="xml-stripblanks">icons/symbolic/undo-symbolic.svg</file>
+  </gresource>
+</gresources>
