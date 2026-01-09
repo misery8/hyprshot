@@ -1,0 +1,32 @@
+[package]
+name = "hyprshot"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+description = "Lightweight screenshot and annotation tool for Hyprland"
+repository = "https://github.com/misery8/hyprshot"
+categories = ["gui", "command-line-utilities"]
+keywords = ["screenshot", "hyprland", "wayland", "gtk"]
+include = [
+    "src/**/*",
+    "resources/**/*",
+    "build.rs",
+    "Cargo.toml",
+    "LICENSE",
+    "README.md"
+]
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+glib = "0.21"
+gdk-pixbuf = "0.21.2"
+gtk = { package = "gtk4", version = "0.10.1" }
+gdk = { package = "gdk4", version = "0.10.1" }
+
+[dependencies.cairo-rs]
+version = "0.21.5"
+features = ["png"]
+
+[build-dependencies]
+glib-build-tools = "0.21.0"
