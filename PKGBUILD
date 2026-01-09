@@ -1,5 +1,5 @@
 pkgname=hyprshot
-pkgver=0.1.0
+pkgver=0.1.1alpha
 pkgrel=1
 pkgdesc="Lightweight screenshot and annotation tool for Hyprland"
 arch=('x86_64')
@@ -28,7 +28,7 @@ package() {
     install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
 
     # Desktop-file
-    isntall -Dm644 "resources/${pkgname}.desktop" \
+    install -Dm644 "resources/${pkgname}.desktop" \
         "${pkgdir}/usr/share/applications/${pkgname}.desktop"
 
     install -Dm644 "resources/icons/hyprshot.svg" \

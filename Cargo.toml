@@ -1,6 +1,6 @@
 [package]
 name = "hyprshot"
-version = "0.1.0"
+version = "0.1.1-alpha"
 edition = "2021"
 license = "GPL-3.0-or-later"
 description = "Lightweight screenshot and annotation tool for Hyprland"

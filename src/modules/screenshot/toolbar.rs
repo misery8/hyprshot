@@ -49,7 +49,6 @@ macro_rules! create_exlusive_toolbuttons {
                         for (other_button, _) in tool_buttons.iter() {
                             if !other_button.eq(&button) && other_button.is_active() {
                                 other_button.set_active(false);
-                                eprintln!("test");
                             }
                         }
                         let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetTool(current_variant)));
@@ -81,6 +80,8 @@ impl Toolbar {
             .css_name("toolbar")
             .can_target(true)
             .opacity(0.0)
+            .hexpand(false)
+            .vexpand(false)
             .build();
 
         let toolbar = Self { container };
@@ -220,8 +221,9 @@ impl Toolbar {
 
     pub fn update_position(&self, rect: &Rect) {
         let allocation = self.container.allocation();
+        let x_pos = (rect.x + rect.w - allocation.width()).max(10);
         
-        self.container.set_margin_start(rect.x + rect.w - allocation.width());
+        self.container.set_margin_start(x_pos);
         self.container.set_margin_top(rect.y + rect.h + 8);
     }
 
