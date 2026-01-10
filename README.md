@@ -1,5 +1,12 @@
 # Hyprshot
 
+![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/misery8/hyprshot?label=version&color=orange)
+![Status](https://img.shields.io/badge/status-alpha-red)
+![Wayland](https://img.shields.io/badge/Wayland-supported-blue?logo=wayland&logoColor=white)
+![Hyprland](https://img.shields.io/badge/Hyprland-optimized-33ccff?logo=hyprland&logoColor=white)
+![Rust](https://img.shields.io/badge/Built%20with-Rust-black?logo=rust&logoColor=white)
+![GTK4](https://img.shields.io/badge/UI-GTK4-62a0ea?logo=gnome&logoColor=white)
+
 > A fast, annotation-enabled screenshot tool for **Hyprland** (Wayland), built with **Rust** and **GTK 4**.
 > Capture, annotate, and copy — all in seconds.
 
