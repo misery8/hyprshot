@@ -13,7 +13,6 @@ pub struct ScreenshotState {
     drag_start: Option<(i32, i32)>,
     drag_origin: Option<Rect>,
     drag_mode: Option<DragMode>,
-    shapes: Vec<Shape>,
     current_shape: Option<Shape>,
 }
 
@@ -30,7 +29,6 @@ impl Default for ScreenshotState {
             drag_start: None,
             drag_origin: None,
             drag_mode: None,
-            shapes: Vec::new(),
             current_shape: None
         }
     }
@@ -41,12 +39,9 @@ impl ScreenshotState {
     pub fn selection(&self) -> &Selection { &self.selection }
     pub fn is_paused(&self) -> bool { self.paused }
     pub fn mouse_pos(&self) -> (i32, i32) { self.mouse_pos }
-    // pub fn current_tool(&self) -> Tool { self.current_tool }
-    // pub fn current_color(&self) -> (u8, u8, u8) { self.current_color }
-    pub fn shapes(&self) -> &[Shape] { &self.shapes }
     pub fn current_shape(&self) -> Option<&Shape> { self.current_shape.as_ref() }
-    // pub fn is_selecting(&self) -> bool { self.drag_mode.is_some() }
-
+    pub fn current_tool(&self) -> Tool { self.current_tool }
+    
     // Mutable
     pub fn toogle_pause(&mut self) {
         if self.selection.is_active() && !self.paused {
@@ -135,16 +130,9 @@ impl ScreenshotState {
 
     pub fn end_drag(&mut self) {
         self.drag_start = None;
-
-        if self.current_tool != Tool::None {
-            if let Some(shape) = self.current_shape {
-                self.shapes.push(shape);
-            }
-            return;
-        }
-
         self.drag_origin = None;
         self.drag_mode = None;
+        self.current_shape = None;
 
         if self.selection.is_active() {
             self.selection = Selection::finalized(self.selection.rect);
@@ -373,4 +361,18 @@ pub enum Shape {
     Blur {
         rect: Rect,
     },
+}
+
+impl Shape {
+    pub fn is_valid(&self) -> bool {
+        match self {
+            Shape::Arrow { from, to, .. } => {
+                let dist = ((to.0 - from.0).pow(2) + (to.1 - from.1).pow(2)).abs();
+                dist > 10
+            }
+            Shape::Rectangle { rect, .. } | Shape::Blur { rect } => {
+                rect.w > 5 && rect.h > 5
+            }
+        }
+    }
 }

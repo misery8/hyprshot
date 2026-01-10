@@ -30,7 +30,7 @@ pub fn init_events(tx: Sender<AppAction>, widgets: &ScreenshotWidgets) {
         }
     ));
 
-    widgets.canvas.add_controller(drag);
+    widgets.drawing_area.add_controller(drag);
 
     let controller = EventControllerMotion::new();        
     controller.connect_motion(clone!(#[strong] tx, move |_c, x, y| {
@@ -38,7 +38,7 @@ pub fn init_events(tx: Sender<AppAction>, widgets: &ScreenshotWidgets) {
         }
     ));        
 
-    widgets.canvas.add_controller(controller);
+    widgets.drawing_area.add_controller(controller);
 
     let controller = ShortcutController::new();
         
@@ -60,13 +60,22 @@ pub fn init_events(tx: Sender<AppAction>, widgets: &ScreenshotWidgets) {
             #[strong] tx,
             move |_, _,| {
                 let _ = tx.send(AppAction::Screenshot(ScreenshotAction::Save));
-                    // if s.is_paused() && s.selection().is_active() {
-                    //     on_action(EditorAction::Save);
-                    // } 
                 glib::Propagation::Stop
             }
         )
     ))));
+
+    // Ctrl+Z
+    controller.add_shortcut(Shortcut::new(
+        Some(ShortcutTrigger::parse_string("<Primary>z").unwrap()),
+        Some(CallbackAction::new(clone!(
+            #[strong] tx,
+            move |_, _| {
+                let _ = tx.send(AppAction::Screenshot(ScreenshotAction::Undo));
+                glib::Propagation::Proceed
+            }
+        )))
+    ));
 
     widgets.window.add_controller(controller);
 

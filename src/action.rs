@@ -15,6 +15,7 @@ pub enum ScreenshotAction {
     DragEnd,
 
     Save,
+    Undo,
 }
 
 pub enum GlobalAction {

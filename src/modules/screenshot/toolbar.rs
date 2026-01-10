@@ -106,9 +106,11 @@ impl Toolbar {
         };
     }
 
-    fn setup_undo_button(&self, _tx: Sender<AppAction>) {
+    fn setup_undo_button(&self, tx: Sender<AppAction>) {
         let button = default_button("/io/github/misery8/hyprshot/icons/symbolic/undo-symbolic.svg");
-        // button.connect_clicked(clone!(#[strong] tx, move |_| tx.send(AppAction::Screenshot(ScreenshotAction::Undo))));
+        button.connect_clicked(clone!(#[strong] tx, move |_| {
+            let _ = tx.send(AppAction::Screenshot(ScreenshotAction::Undo));
+        }));
         self.container.append(&button);
     }
 
