@@ -17,7 +17,6 @@ pub fn draw_selection(
 ) {
     let (x, y, w, h) = rect.as_f64();
 
-    // cr.set_operator(cairo::Operator::Clear);
     cr.rectangle(x, y, w, h);
     cr.set_fill_rule(cairo::FillRule::EvenOdd);
 
@@ -89,33 +88,22 @@ pub fn draw_rectangle(
     cr.stroke().expect("Cairo stroke failed");
 }
 
-pub fn draw_blur(
-    surface: &ImageSurface,
-    cr: &Context,
-    rect: &Rect
-) {
-
+pub fn draw_blur(surface: &ImageSurface, cr: &Context, rect: &Rect) {
     let (x, y, w, h) = rect.as_f64();
-
-    let blur_surface = ImageSurface::create(cairo::Format::ARgb32, rect.w, rect.h)
-        .expect("Failed to create temporary surface");
-
-    let blur_cr = Context::new(&blur_surface)
-        .expect("Failed to create blur context");
-    blur_cr.set_source_surface(surface, -x, -y).expect("Failed to set source");
-    blur_cr.paint().expect("Failed to paint copy");
     
-    crate::common::cairo_blur::blur_image_surface_v2(&blur_surface, 10)
-        .expect("Failed to blur surface");
+    let blurred_region = match crate::common::cairo_blur::blur_image_surface(
+        surface, x, y, rect.w, rect.h, 10
+    ) {
+        Ok(s) => s,
+        Err(_) => return,
+    };
 
     cr.save().expect("Failed to save state");
-    
     cr.rectangle(x, y, w, h);
     cr.clip();
 
-    cr.set_source_surface(&blur_surface, x, y).expect("Failed to set result source");
-    cr.paint().expect("Failed to paint final blur");
+    cr.set_source_surface(&blurred_region, x, y).expect("Failed to set source");
+    cr.paint().expect("Failed to paint");
     
     cr.restore().expect("Failed to restore state");
-
 }

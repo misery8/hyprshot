@@ -80,8 +80,8 @@ impl ScreenshotWidgets {
 
             cr.fill().unwrap();
 
-            if let Some(current_shape) = state.current_shape() {
-                render::draw_shape(&surface, cr, current_shape);
+            if let Some(shape) = state.current_shape() {
+                render::draw_shape(&surface, cr, shape);
             }
         });
     }
