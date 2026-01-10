@@ -1,5 +1,5 @@
 pkgname=hyprshot
-pkgver=0.2.0alpha
+pkgver=0.2.1alpha
 pkgrel=1
 pkgdesc="Lightweight screenshot and annotation tool for Hyprland"
 arch=('x86_64')

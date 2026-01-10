@@ -49,7 +49,7 @@ impl ScreenshotWidgets {
         window.init_layer_shell();
         window.set_layer(gtk4_layer_shell::Layer::Overlay);
         window.set_exclusive_zone(-1);
-        window.set_keyboard_mode(gtk4_layer_shell::KeyboardMode::Exclusive);
+        window.set_keyboard_mode(gtk4_layer_shell::KeyboardMode::OnDemand);
 
         window.set_anchor(gtk4_layer_shell::Edge::Top, true);
         window.set_anchor(gtk4_layer_shell::Edge::Bottom, true);
