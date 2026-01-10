@@ -1,5 +1,5 @@
 pkgname=hyprshot
-pkgver=0.1.2alpha
+pkgver=0.2.0alpha
 pkgrel=1
 pkgdesc="Lightweight screenshot and annotation tool for Hyprland"
 arch=('x86_64')
@@ -10,7 +10,7 @@ makedepends=('cargo')
 provides=("${pkgname}")
 conflicts=("${pkgname}")
 source=("${pkgname}-${pkgver}.tar.gz::${url}/archive/refs/tags/v${pkgver}.tar.gz")
-sha256sums=('066635ed443adbc2724787d8afc6c88c0593eee4c1aa494372b8553c2e0f33bb')
+sha256sums=('d0e8529d945bae7abb1ef3fedfb5f68257765d56a05df21c2e3ae26713352520')
 
 build() {
     cd "${pkgname}-${pkgver}"

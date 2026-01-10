@@ -2,6 +2,7 @@ use std::{cell::RefCell, rc::Rc, sync::mpsc::Sender};
 
 use gtk::{Application, ApplicationWindow, DrawingArea, Overlay};
 use gtk::prelude::*;
+use gtk4_layer_shell::LayerShell;
 
 use crate::action::AppAction;
 use crate::modules::screenshot::canvas::Canvas;
@@ -42,9 +43,19 @@ impl ScreenshotWidgets {
         let window = ApplicationWindow::builder()
             .application(app)
             .child(&overlay)
+            .title("Hyprshot")
             .build();
+        
+        window.init_layer_shell();
+        window.set_layer(gtk4_layer_shell::Layer::Overlay);
+        window.set_exclusive_zone(-1);
+        window.set_keyboard_mode(gtk4_layer_shell::KeyboardMode::Exclusive);
 
-        window.fullscreen();
+        window.set_anchor(gtk4_layer_shell::Edge::Top, true);
+        window.set_anchor(gtk4_layer_shell::Edge::Bottom, true);
+        window.set_anchor(gtk4_layer_shell::Edge::Left, true);
+        window.set_anchor(gtk4_layer_shell::Edge::Right, true);
+
         window.present();
 
         Self { window, drawing_area, toolbar }
