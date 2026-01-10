@@ -9,17 +9,17 @@ depends=('gtk4' 'gdk-pixbuf2' 'glib2' 'cairo' 'grim' 'slurp')
 makedepends=('cargo')
 provides=("${pkgname}")
 conflicts=("${pkgname}")
-source=("${pkgname}-${pkgver}.tar.gz::${url}/archive/refs/tags/v${pkgver}.tar.gz")
-sha256sums=('d0e8529d945bae7abb1ef3fedfb5f68257765d56a05df21c2e3ae26713352520')
+source=("${pkgname}::git+${url}.git")
+sha256sums=('SKIP')
 
 build() {
-    cd "${pkgname}-${pkgver}"
+    cd "${pkgname}"
     export RUSTUP_TOOLCHAIN=stable
     cargo build --release --locked
 }
 
 package() {
-    cd "${pkgname}-${pkgver}"
+    cd "${pkgname}"
 
     # Bin
     install -Dm755 "target/release/${pkgname}" -t "${pkgdir}/usr/bin/"
