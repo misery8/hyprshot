@@ -2,7 +2,7 @@ use std::process::Command;
 
 use anyhow::Result;
 use gdk_pixbuf::{Pixbuf, PixbufLoader};
-use gtk::prelude::PixbufLoaderExt;
+use gtk4::prelude::PixbufLoaderExt;
 
 pub fn capture_fullscreen() -> Result<Pixbuf> {
     

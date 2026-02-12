@@ -3,8 +3,8 @@ use std::rc::Rc;
 use std::sync::mpsc::Sender;
 
 use glib::clone;
-use gtk::{Box, Button, CssProvider, DrawingArea, Grid, Image, Overlay, Popover, ToggleButton};
-use gtk::{prelude::*};
+use gtk4::{Box, Button, CssProvider, DrawingArea, Grid, Image, Overlay, Popover, ToggleButton};
+use gtk4::{prelude::*};
 
 use crate::action::{AppAction, ScreenshotAction};
 use crate::modules::screenshot::state::{Rect, Tool};
@@ -74,9 +74,9 @@ pub struct Toolbar {
 impl Toolbar {
     pub fn new(tx: Sender<AppAction>) -> Self {
         let container = Box::builder()
-            .orientation(gtk::Orientation::Horizontal)
+            .orientation(gtk4::Orientation::Horizontal)
             .spacing(6).focusable(false)
-            .halign(gtk::Align::Start).valign(gtk::Align::Start)
+            .halign(gtk4::Align::Start).valign(gtk4::Align::Start)
             .css_name("toolbar")
             .can_target(true)
             .opacity(0.0)
@@ -119,7 +119,7 @@ impl Toolbar {
 
         let color_indicator = DrawingArea::builder()
             .width_request(12).height_request(12)
-            .halign(gtk::Align::End).valign(gtk::Align::End)
+            .halign(gtk4::Align::End).valign(gtk4::Align::End)
             .margin_end(2).margin_bottom(2)
             .build();
 
@@ -197,7 +197,7 @@ impl Toolbar {
             let provider = CssProvider::new();
             provider.load_from_data(&color_css);
             color_button.style_context()
-                .add_provider(&provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+                .add_provider(&provider, gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION);
 
             color_button.connect_clicked(clone!(
                 #[strong] tx,

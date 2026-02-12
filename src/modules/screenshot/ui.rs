@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc, sync::mpsc::Sender};
 
-use gtk::{Application, ApplicationWindow, DrawingArea, Overlay};
-use gtk::prelude::*;
+use gtk4::{Application, ApplicationWindow, DrawingArea, Overlay};
+use gtk4::prelude::*;
 use gtk4_layer_shell::LayerShell;
 
 use crate::action::AppAction;
@@ -61,7 +61,7 @@ impl ScreenshotWidgets {
         Self { window, drawing_area, toolbar }
     }
 
-    fn setup_layout(da: &DrawingArea, toolbar_widget: &gtk::Box) -> Overlay {
+    fn setup_layout(da: &DrawingArea, toolbar_widget: &gtk4::Box) -> Overlay {
 
         let overlay = Overlay::new();
         overlay.set_child(Some(da));

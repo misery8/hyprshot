@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::mpsc;
 
-use gtk::prelude::*;
+use gtk4::prelude::*;
 
 mod canvas;
 mod events;
@@ -18,7 +18,7 @@ use crate::capture::clipboard;
 use crate::common::cursor;
 use crate::modules::screenshot::canvas::Canvas;
 
-pub fn run(app: &gtk::Application) {
+pub fn run(app: &gtk4::Application) {
     let (tx, rx) = mpsc::channel::<AppAction>();
     let app_handle = app.clone();
     let state = Rc::new(RefCell::new(ScreenshotState::default()));
@@ -48,7 +48,7 @@ pub fn run(app: &gtk::Application) {
 }
 
 fn handle_action(
-    app: &gtk::Application,
+    app: &gtk4::Application,
     action: AppAction,
     state: &Rc<RefCell<ScreenshotState>>,
     widgets: &ScreenshotWidgets,

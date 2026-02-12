@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 
-use gtk::prelude::*;
-use gtk::{Application, gio};
+use gtk4::prelude::*;
+use gtk4::{Application, gio};
 
 mod action;
 mod capture;

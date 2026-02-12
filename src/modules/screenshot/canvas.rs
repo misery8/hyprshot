@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc, result::Result};
 
 use anyhow::{Ok, Error};
-use gdk::ffi::gdk_cairo_set_source_pixbuf;
+use gdk4::ffi::gdk_cairo_set_source_pixbuf;
 use cairo::{ImageSurface, Context};
 use glib::translate::ToGlibPtr;
 

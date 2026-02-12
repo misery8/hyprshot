@@ -1,8 +1,8 @@
 use std::sync::mpsc::Sender;
 
-use gdk::Key;
+use gdk4::Key;
 use glib::clone;
-use gtk::{
+use gtk4::{
     EventControllerMotion, GestureDrag, EventControllerKey,
     Shortcut, CallbackAction, ShortcutController, ShortcutTrigger, prelude::*
 };

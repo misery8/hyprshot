@@ -1,6 +1,6 @@
-use gdk::Cursor;
-use gtk::DrawingArea;
-use gtk::prelude::WidgetExt;
+use gdk4::Cursor;
+use gtk4::DrawingArea;
+use gtk4::prelude::WidgetExt;
 
 use crate::modules::screenshot::state::{Rect, SelectionHitZone};
 
