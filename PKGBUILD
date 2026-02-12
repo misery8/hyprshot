@@ -1,28 +1,34 @@
 pkgname=hyprshot
-pkgver=0.2.1alpha
+pkgver=0.3.0.alpha
 pkgrel=1
-pkgdesc="Lightweight screenshot and annotation tool for Hyprland"
+pkgdesc="Lightweight screenshot and annotation tool for Hyprland (Rust version)"
 arch=('x86_64')
 url="https://github.com/misery8/${pkgname}"
 license=('GPL3')
-depends=('gtk4' 'gdk-pixbuf2' 'glib2' 'cairo' 'grim' 'slurp')
-makedepends=('cargo')
+depends=('gtk4' 'gdk-pixbuf2' 'glib2' 'cairo' 'grim' 'slurp', 'lib-layershell')
+makedepends=('cargo', 'git')
 provides=("${pkgname}")
 conflicts=("${pkgname}")
 source=("${pkgname}::git+${url}.git")
 sha256sums=('SKIP')
 
+prepare() {
+    cd "${pkgname}"
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
 build() {
     cd "${pkgname}"
-    export RUSTUP_TOOLCHAIN=stable
-    cargo build --release --locked
+    export RUSTFLAGS="-C opt-level=3 -C gebuginfo=0"
+    cargo build --release --locked --all-targets
 }
 
 package() {
     cd "${pkgname}"
 
-    # Bin
-    install -Dm755 "target/release/${pkgname}" -t "${pkgdir}/usr/bin/"
+    # Bin4
+    install -Dm755 "target/release/${pkgname}" "${pkgdir}/usr/bin/${pkgname}"
+    install -Dm755 "target/release/clipboard" "${pkgdir}/usr/lib/${pkgname}/clipboard"
 
     # License
     install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
