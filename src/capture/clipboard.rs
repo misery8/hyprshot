@@ -1,38 +1,29 @@
+use std::env;
 use std::io::Write;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result};
 
 pub fn copy_to_clipboard(png_data: &[u8]) -> Result<()> {
 
-    let image = image::load_from_memory_with_format(png_data, image::ImageFormat::Png)
-        .context("Failed to load PNG image from memory")?;
-
-    let mut bmp_buffer = Vec::new();
-    let mut cursor = std::io::Cursor::new(&mut bmp_buffer);
-
-    image.write_to(&mut cursor, image::ImageFormat::Bmp)
-        .context("Failed to convert image to BMP format")?;
+    let current_exe = env::current_exe().context("Failed to get exe path")?;
+    let mut daemon_path = current_exe.with_file_name("clipboard");
     
-    let mut child = Command::new("wl-copy")
-        .args(["-t", "image/bmp"])
-        .stdin(Stdio::piped())
-        .spawn()
-        .context("Failed to spawn wl-copy stdin")?;
-
-    {
-        let stdin = child.stdin.as_mut()
-            .context("Failed to access wl-copy stdin")?;
-        stdin.write_all(&bmp_buffer)
-            .context("Failed to write date to clipboard pipe")?;
+    if !daemon_path.exists() {
+        daemon_path = PathBuf::from("/usr/lib/hyprshot/clipboard");
     }
-    let status = child.wait().context("Failed to wait for wl-copy")?;
-    
-    anyhow::ensure!(
-        status.success(),
-        "wl-copy failed with exit code: {:?}",
-        status.code()
-    );
 
+    let mut child = Command::new(daemon_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .context("Failed to spawn clipboard daemon. Is the binary missing?")?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin.write_all(png_data).context("Failed to pipe PNG data to daemon")?;
+    }
+    
     Ok(())
 }
