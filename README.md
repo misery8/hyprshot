@@ -13,8 +13,9 @@
 ![Hyprshot Editor Preview](preview.png)
 
 - **Instant launcher** via `PrintScreen`
-- **Draw shapes** and **blur** directly on your screenshot
-- **Copies result to clipboard** — no file clutter
+- **Pure Memory Flow** - No temporary files, everything is piped directly to the clipboard.
+- **Smart Clipboard** - Integrated daemon provides both **PNG** and **BMP** targets for seamless pasting into Windows-native app (VMs, RDP).
+- **Rich Annotations** - Built-in arrows, rectangles, and blur tool to hide sensitive data.
 - **Two modes**:
     - **Quick capture**: select -> release -> done
     - **Editor mode**: `Ctrl` + select -> annotate -> `Ctrl+S` to copy
@@ -37,6 +38,10 @@ Perfect for quick sharing, bug reporting, or visual notes — without leaving yo
 4. Draw shapes, blur sensitive data, adjust selection
 5. Press `Ctrl+S` -> annotated image is copied to clipboard
 
+### Shortcuts
+- `Ctrl+Z`: Undo last action
+- `Esc`: Exit without saving
+
 > No UI windows, no dialogs — just pure speed.
 
 ---
@@ -53,20 +58,15 @@ Make sure you have:
 git clone [https://github.com/misery8/hyprshot.git](https://github.com/misery8/hyprshot.git)
 cd hyprshot
 cargo build --release
-sudo install -Dm755 target/release/hyprshot /usr/local/bin/hyprshot
-```
-
-### Arch Linux (AUR-coming soon)
-
-```sh
-yay -S hyprshot-git
+sudo install -Dm755 target/release/hyprshot /usr/bin/hyprshot
+sudo install -Dm755 target/release/clipboard /usr/lib/hyprshot/clipboard
 ```
 
 ## Dependencies
 
 - Runtime:
     - `gtk4`, `glib2`, `cairo`
-    - `grim`, `slurp` (essential for screen capture)
+    - `grim` (essential for screen capture)
 
 ___
 
