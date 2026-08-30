@@ -1,7 +1,7 @@
 # Hyprshot
 
 ![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/misery8/hyprshot?label=version&color=orange)
-![Status](https://img.shields.io/badge/status-alpha-red)
+![Status](https://img.shields.io/badge/status-stable-green)
 ![Wayland](https://img.shields.io/badge/Wayland-supported-blue?logo=wayland&logoColor=white)
 ![Hyprland](https://img.shields.io/badge/Hyprland-optimized-33ccff?logo=hyprland&logoColor=white)
 ![Rust](https://img.shields.io/badge/Built%20with-Rust-black?logo=rust&logoColor=white)
