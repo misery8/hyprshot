@@ -40,6 +40,11 @@ impl Canvas {
         surface
     }
 
+    pub fn get_screen_size(&self) -> (i32, i32) {
+        let surface = self.surface.borrow();
+        (surface.width(), surface.height())        
+    }
+
     pub fn save_shapshot(&self, state: &ScreenshotState) {
 
         if state.current_tool() != Tool::None

@@ -14,6 +14,7 @@ pub struct ScreenshotState {
     drag_origin: Option<Rect>,
     drag_mode: Option<DragMode>,
     current_shape: Option<Shape>,
+    screen_size: (i32, i32),
 }
 
 impl Default for ScreenshotState {
@@ -29,7 +30,8 @@ impl Default for ScreenshotState {
             drag_start: None,
             drag_origin: None,
             drag_mode: None,
-            current_shape: None
+            current_shape: None,
+            screen_size: (0, 0)
         }
     }
 }
@@ -41,9 +43,14 @@ impl ScreenshotState {
     pub fn mouse_pos(&self) -> (i32, i32) { self.mouse_pos }
     pub fn current_shape(&self) -> Option<&Shape> { self.current_shape.as_ref() }
     pub fn current_tool(&self) -> Tool { self.current_tool }
+    pub fn screen_size(&self) -> (i32, i32) { self.screen_size }
     
     // Mutable
-    pub fn toogle_pause(&mut self) {
+    pub fn set_screen_size(&mut self, size: (i32, i32)) {
+        self.screen_size = size;
+    }
+
+    pub fn toggle_pause(&mut self) {
         if self.selection.is_active() && !self.paused {
             self.paused = !self.paused;
         }
@@ -104,23 +111,42 @@ impl ScreenshotState {
         let cx = dx + start_x;
         let cy = dy + start_y;
 
+        let (screen_w, screen_h) = self.screen_size;
+
         match mode {
             DragMode::Create => {
-                self.selection.rect.x = start_x.min(cx);
-                self.selection.rect.y = start_y.min(cy);
-                self.selection.rect.w = (cx - start_x).abs();
-                self.selection.rect.h = (cy - start_y).abs();
+                let new_x = start_x.min(cx);
+                let new_y = start_y.min(cy);
+                let new_w = (cx - start_x).abs();
+                let new_h = (cy - start_y).abs();
+
+                self.selection.rect.x = new_x.max(0).min(screen_w);
+                self.selection.rect.y = new_y.max(0).min(screen_h);
+                self.selection.rect.w = new_w.min(screen_w - self.selection.rect.x);
+                self.selection.rect.h = new_h.min(screen_h - self.selection.rect.y);
             }
 
             DragMode::Move => {
                 if self.current_tool == Tool::None {
-                    self.selection.rect.x = origin.x + dx;
-                    self.selection.rect.y = origin.y + dy;
+                    let new_x = origin.x + dx;
+                    let new_y = origin.y + dy;
+
+                    self.selection.rect.x = new_x.max(0).min(screen_w - origin.w);
+                    self.selection.rect.y = new_y.max(0).min(screen_h - origin.h);
                 }
             }
 
             DragMode::Resize(zone) => {
                 self.selection.rect = self.resize_rect(&zone, dx, dy);
+                self.selection.rect.x = self.selection.rect.x.max(0);
+                self.selection.rect.y = self.selection.rect.y.max(0);
+                
+                if screen_w > 0 {
+                    self.selection.rect.w = self.selection.rect.w.min(screen_w - self.selection.rect.x);
+                }
+                if screen_h > 0 {
+                    self.selection.rect.h = self.selection.rect.h.min(screen_h - self.selection.rect.y);
+                }
             }
         }
 
@@ -134,7 +160,7 @@ impl ScreenshotState {
         self.drag_mode = None;
         self.current_shape = None;
 
-        if self.selection.is_active() {
+        if self.selection.is_active() && !self.selection.rect.is_empty() {
             self.selection = Selection::finalized(self.selection.rect);
         } else {
             self.selection = Selection::idle();
@@ -181,51 +207,101 @@ impl ScreenshotState {
     fn resize_rect(&self, zone: &SelectionHitZone, x: i32, y: i32) -> Rect {
 
         let origin = self.drag_origin.unwrap();
+        let (screen_w, screen_h) = self.screen_size;
         let mut rect = origin;
 
         match zone {
             // Corners
             SelectionHitZone::NW => {
-                rect.x = origin.x + x;
-                rect.y = origin.y + y;
+                rect.x = (origin.x + x).max(0);
+                rect.y = (origin.y + y).max(0);
                 rect.w = (origin.w - x).max(1);
                 rect.h = (origin.h - y).max(1);
+
+                if screen_w > 0 && rect.x + rect.w > screen_w {
+                    rect.w = (screen_w - rect.x).max(1);
+                }
+
+                if screen_h > 0 && rect.y + rect.h > screen_h {
+                    rect.h = (screen_h - rect.y).max(1);
+                }
             }
 
             SelectionHitZone::NE => {
-                rect.y = origin.y + y;
+                rect.y = (origin.y + y).max(0);
                 rect.w = (origin.w + x).max(1);
                 rect.h = (origin.h - y).max(1);
+
+                if screen_w > 0 && rect.x + rect.w > screen_w {
+                    rect.w = (screen_w - rect.x).max(1);
+                }
+
+                if rect.y < 0 {
+                    rect.y = 0;
+                }
             }
 
             SelectionHitZone::SE => {
                 rect.w = (origin.w + x).max(1);
                 rect.h = (origin.h + y).max(1);
+
+                if screen_w > 0 && rect.x + rect.w > screen_w {
+                    rect.w = (screen_w - rect.x).max(1);
+                }
+
+                if screen_h > 0 && rect.y + rect.h > screen_h {
+                    rect.h = (screen_h - rect.y).max(1);
+                }
             }
 
             SelectionHitZone::SW => {
-                rect.x = origin.x + x;
+                rect.x = (origin.x + x).max(0);
                 rect.w = (origin.w - x).max(1);
                 rect.h = (origin.h + y).max(1);
+
+                if rect.x < 0 {
+                    rect.x = 0;
+                }
+
+                if screen_h > 0 && rect.y + rect.h > screen_h {
+                    rect.h = (screen_h - rect.y).max(1);
+                }
+
             }
             
             // Sides
             SelectionHitZone::N => {
-                rect.y = origin.y + y;
+                rect.y = (origin.y + y).max(0);
                 rect.h = (origin.h - y).max(1);
+
+                if rect.y < 0 {
+                    rect.y = 0;
+                }
             }
 
             SelectionHitZone::S => {
                 rect.h = (origin.h + y).max(1);
+
+                if screen_h > 0 && rect.y + rect.h > screen_h {
+                    rect.h = (screen_h - rect.y).max(1);
+                }
             }
 
             SelectionHitZone::W => {
-                rect.x = origin.x + x;
+                rect.x = (origin.x + x).max(0);
                 rect.w = (origin.w - x).max(1);
+
+                if rect.x < 0 {
+                    rect.x = 0;
+                }
             }
 
             SelectionHitZone::E => {
                 rect.w = (origin.w + x).max(1);
+
+                if screen_w > 0 && rect.x + rect.w > screen_w {
+                    rect.w = (screen_w - rect.x).max(1);
+                }
             }
 
             _ => {}

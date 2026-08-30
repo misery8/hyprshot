@@ -25,14 +25,16 @@ impl ScreenshotWidgets {
         canvas: Rc<Canvas>,
     ) -> Self {
 
-        let da_size = {
-            let surf = canvas.surface.borrow();
-            (surf.width(), surf.height())
-        };
+        // let da_size = {
+        //     let surf = canvas.surface.borrow();
+        //     (surf.width(), surf.height())
+        // };
 
         let drawing_area = DrawingArea::builder()
-            .content_width(da_size.0)
-            .content_height(da_size.1)
+            // .content_width(da_size.0)
+            // .content_height(da_size.1)
+            .hexpand(true)
+            .vexpand(true)
             .build();
 
         Self::setup_render_loop(&drawing_area, state, canvas);
@@ -44,6 +46,7 @@ impl ScreenshotWidgets {
             .application(app)
             .child(&overlay)
             .title("Hyprshot")
+            .decorated(false)
             .build();
         
         window.init_layer_shell();
@@ -64,6 +67,8 @@ impl ScreenshotWidgets {
     fn setup_layout(da: &DrawingArea, toolbar_widget: &gtk4::Box) -> Overlay {
 
         let overlay = Overlay::new();
+        overlay.set_vexpand(true);
+        overlay.set_hexpand(true);
         overlay.set_child(Some(da));
         overlay.add_overlay(toolbar_widget);
 

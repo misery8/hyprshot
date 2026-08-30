@@ -21,12 +21,17 @@ use crate::modules::screenshot::canvas::Canvas;
 pub fn run(app: &gtk4::Application) {
     let (tx, rx) = mpsc::channel::<AppAction>();
     let app_handle = app.clone();
-    let state = Rc::new(RefCell::new(ScreenshotState::default()));
+    let mut state = ScreenshotState::default();
 
     let canvas = Rc::new(
         Canvas::from_screenshot()
             .expect("Failed to create ")
     );
+    
+    let screen_size = canvas.get_screen_size();
+    state.set_screen_size(screen_size);
+
+    let state = Rc::new(RefCell::new(state));
 
     let widgets = Rc::new(
         ScreenshotWidgets::build(
@@ -63,10 +68,11 @@ fn handle_action(
             match sub_action {
                 ScreenshotAction::SetTool(tool) => s.set_tool(tool),
                 ScreenshotAction::SetColor(red, green, blue) => s.set_color((red, green, blue)),
-                ScreenshotAction::ToogleMode => {
+                ScreenshotAction::ToggleMode => {
                     if s.selection().is_active() && !s.is_paused() {
-                        s.toogle_pause();
+                        s.toggle_pause();
                         widgets.toolbar.widget().set_opacity(1.0);
+                        widgets.toolbar.widget().set_can_target(true);
                     }
                 }
                 ScreenshotAction::MouseMove(x, y) => {
@@ -78,7 +84,7 @@ fn handle_action(
                             &widgets.drawing_area,
                         );
                         if s.is_paused() {
-                            widgets.toolbar.update_position(&s.selection().rect());
+                            widgets.toolbar.update_position(&s.selection().rect(), s.screen_size());
                         }
                     }
                 }
@@ -88,7 +94,7 @@ fn handle_action(
                 },
                 ScreenshotAction::DragUpdate(x, y) => {
                     s.update_drag(x, y);
-                    widgets.toolbar.update_position(&s.selection().rect());
+                    widgets.toolbar.update_position(&s.selection().rect(), s.screen_size());
                 }
                 ScreenshotAction::DragEnd => {
                     if let Some(shape) = s.current_shape() {

@@ -28,7 +28,7 @@ pub fn apply_cursor(drawing_area: &DrawingArea, zone: &SelectionHitZone) {
     }
 }
 
-pub fn get_cursor_zone(rect: &Rect, mause_pos: (i32, i32), margin: Option<i32>) -> SelectionHitZone {
+pub fn get_cursor_zone(rect: &Rect, mouse_pos: (i32, i32), margin: Option<i32>) -> SelectionHitZone {
     
     if rect.is_empty() {
         return SelectionHitZone::Outside;
@@ -36,7 +36,7 @@ pub fn get_cursor_zone(rect: &Rect, mause_pos: (i32, i32), margin: Option<i32>) 
 
     let margin = margin.unwrap_or(10);
 
-    let (x, y) = mause_pos;
+    let (x, y) = mouse_pos;
 
     let left = rect.x;
     let right = rect.x + rect.w;

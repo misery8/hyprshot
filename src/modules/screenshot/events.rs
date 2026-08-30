@@ -82,7 +82,7 @@ pub fn init_events(tx: Sender<AppAction>, widgets: &ScreenshotWidgets) {
     let key_controller = EventControllerKey::new();
     key_controller.connect_key_pressed(clone!(#[strong] tx, move |_, key, _, _| {
         if key == Key::Control_L || key == Key::Control_R {
-            let _ = tx.send(AppAction::Screenshot(ScreenshotAction::ToogleMode));
+            let _ = tx.send(AppAction::Screenshot(ScreenshotAction::ToggleMode));
 
             glib::Propagation::Stop
         } else {

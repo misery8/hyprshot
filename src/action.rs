@@ -8,7 +8,7 @@ pub enum AppAction {
 pub enum ScreenshotAction {
     SetTool(Tool),
     SetColor(u8, u8, u8),
-    ToogleMode,
+    ToggleMode,
     MouseMove(i32, i32),
     DragBegin(i32, i32),
     DragUpdate(i32, i32),

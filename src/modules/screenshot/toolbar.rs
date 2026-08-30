@@ -78,7 +78,7 @@ impl Toolbar {
             .spacing(6).focusable(false)
             .halign(gtk4::Align::Start).valign(gtk4::Align::Start)
             .css_name("toolbar")
-            .can_target(true)
+            .can_target(false)
             .opacity(0.0)
             .hexpand(false)
             .vexpand(false)
@@ -221,12 +221,37 @@ impl Toolbar {
 
     pub fn widget(&self) -> &Box { &self.container }
 
-    pub fn update_position(&self, rect: &Rect) {
+    pub fn update_position(&self, rect: &Rect, screen_size: (i32, i32)) {
         let allocation = self.container.allocation();
-        let x_pos = (rect.x + rect.w - allocation.width()).max(10);
-        
-        self.container.set_margin_start(x_pos);
-        self.container.set_margin_top(rect.y + rect.h + 8);
+        let toolbar_w = allocation.width();
+        let toolbar_h = allocation.height();
+
+        let (screen_w, screen_h) = screen_size;
+
+        let right_x = (rect.x + rect.w - toolbar_w)
+            .clamp(0, screen_w - toolbar_w);
+
+        let center_x = (rect.x + (rect.w - toolbar_w) / 2)
+            .clamp(0, screen_w - toolbar_w);
+
+        let bottom_y = rect.y + rect.h + 8;
+
+        if bottom_y + toolbar_h <= screen_h {
+            self.container.set_margin_start(right_x);
+            self.container.set_margin_top(bottom_y);
+            return;
+        }
+
+        let top_y = rect.y - toolbar_h - 8;
+
+        if top_y >= 8 {
+            self.container.set_margin_start(center_x);
+            self.container.set_margin_top(top_y);
+            return;
+        }
+
+        self.container.set_margin_start(center_x);
+        self.container.set_margin_top(8);
     }
 
 }

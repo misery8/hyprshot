@@ -1,5 +1,5 @@
 pkgname=hyprshot
-pkgver=0.3.0.alpha
+pkgver=0.4.0
 pkgrel=1
 pkgdesc="Lightweight screenshot and annotation tool for Hyprland (Rust version)"
 arch=('x86_64')
@@ -7,29 +7,22 @@ url="https://github.com/misery8/${pkgname}"
 license=('GPL3')
 depends=('gtk4' 'gdk-pixbuf2' 'glib2' 'cairo' 'grim' 'gtk4-layer-shell')
 makedepends=('cargo' 'git')
-provides=("${pkgname}")
-conflicts=("${pkgname}")
-source=("${pkgname}::git+${url}.git")
+source=("${pkgname}-${pkgver}::git+${url}.git#tag=v${pkgver}")
 sha256sums=('SKIP')
 
-pkgver() {
-    cd "${pkgname}"
-    grep '^version = ' Cargo.toml | cut -d '"' -f 2 | sed 's/-/./g'
-}
-
 prepare() {
-    cd "${pkgname}"
+    cd "${pkgname}-${pkgver}"
     cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
 }
 
 build() {
-    cd "${pkgname}"
+    cd "${pkgname}-${pkgver}"
     export RUSTFLAGS="-C opt-level=3 -C debuginfo=0"
     cargo build --release --locked --all-targets
 }
 
 package() {
-    cd "${pkgname}"
+    cd "${pkgname}-${pkgver}"
 
     # Bin4
     install -Dm755 "target/release/${pkgname}" "${pkgdir}/usr/bin/${pkgname}"
