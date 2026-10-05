@@ -1,11 +1,11 @@
 use std::{cell::RefCell, rc::Rc, result::Result};
 
-use anyhow::{Ok, Error};
+use anyhow::{Error, Ok};
+use cairo::{Context, ImageSurface};
 use gdk4::ffi::gdk_cairo_set_source_pixbuf;
-use cairo::{ImageSurface, Context};
 use glib::translate::ToGlibPtr;
 
-use crate::modules::screenshot::{render, state::{ScreenshotState, Shape, Tool}};
+use crate::modules::screenshot::{render, state::Shape};
 
 #[derive(Debug, Clone)]
 pub struct Canvas {
@@ -15,7 +15,7 @@ pub struct Canvas {
 
 impl Canvas {
     pub fn from_screenshot() -> Result<Self, Error> {
-        let surface= Rc::new(RefCell::new(Self::prepare_background_surface()));
+        let surface = Rc::new(RefCell::new(Self::prepare_background_surface()));
         let history = RefCell::new(Vec::new());
 
         Ok(Self { surface, history })
@@ -34,7 +34,7 @@ impl Canvas {
             unsafe {
                 gdk_cairo_set_source_pixbuf(cr.to_raw_none(), pixbuf.to_glib_none().0, 0.0, 0.0);
             }
-            cr.paint().expect("Failet to paint pixbuf onto surface");
+            cr.paint().expect("Failed to paint pixbuf onto surface");
         }
 
         surface
@@ -45,20 +45,9 @@ impl Canvas {
         (surface.width(), surface.height())
     }
 
-    pub fn save_shapshot(&self, state: &ScreenshotState) {
-        if state.current_tool() != Tool::None
-            && state.is_paused()
-        {
-            let surface = self.surface.borrow();
-            if let Result::Ok(backup) = Self::clone_surface(&surface) {
-                self.history.borrow_mut().push(backup);
-            }
-        }
-    }
-
     pub fn restore_snapshot(&self) {
-        if let Some(previus_surface) = self.history.borrow_mut().pop() {
-            *self.surface.borrow_mut() = previus_surface;
+        if let Some(previous_surface) = self.history.borrow_mut().pop() {
+            *self.surface.borrow_mut() = previous_surface;
         }
     }
 
@@ -72,14 +61,18 @@ impl Canvas {
     }
 
     pub fn apply_shape(&self, shape: &Shape) {
-        if shape.is_valid() {
-            let surface = self.surface.borrow_mut();
-            let cr = Context::new(&*surface)
-                .expect("Failed to bake context");
-            render::draw_shape(&*surface, &cr, shape);
-        } else {
-            self.history.borrow_mut().pop();
+        if !shape.is_valid() {
+            return;
         }
+
+        let surface = self.surface.borrow_mut();
+        if let Ok(backup) = Self::clone_surface(&surface) {
+            self.history.borrow_mut().push(backup);
+        }
+
+        let cr = Context::new(&*surface)
+            .expect("Failed to bake context");
+        render::draw_shape(&*surface, &cr, shape);
     }
 }
 
