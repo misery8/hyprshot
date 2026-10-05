@@ -18,9 +18,7 @@ pub struct ScreenshotState {
 }
 
 impl Default for ScreenshotState {
-    
     fn default() -> Self {
-
         Self {
             selection: Selection::idle(),
             paused: false,
@@ -31,7 +29,7 @@ impl Default for ScreenshotState {
             drag_origin: None,
             drag_mode: None,
             current_shape: None,
-            screen_size: (0, 0)
+            screen_size: (0, 0),
         }
     }
 }
@@ -44,7 +42,7 @@ impl ScreenshotState {
     pub fn current_shape(&self) -> Option<&Shape> { self.current_shape.as_ref() }
     pub fn current_tool(&self) -> Tool { self.current_tool }
     pub fn screen_size(&self) -> (i32, i32) { self.screen_size }
-    
+
     // Mutable
     pub fn set_screen_size(&mut self, size: (i32, i32)) {
         self.screen_size = size;
@@ -84,7 +82,7 @@ impl ScreenshotState {
         let zone = cursor::get_cursor_zone(
             &self.selection.rect,
             self.mouse_pos,
-            Some(10)
+            Some(10),
         );
 
         self.drag_mode = Some(match zone {
@@ -94,7 +92,6 @@ impl ScreenshotState {
         });
 
         self.selection = Selection::dragging(self.selection.rect);
-
     }
 
     pub fn update_drag(&mut self, dx: i32, dy: i32) {
@@ -140,7 +137,7 @@ impl ScreenshotState {
                 self.selection.rect = self.resize_rect(&zone, dx, dy);
                 self.selection.rect.x = self.selection.rect.x.max(0);
                 self.selection.rect.y = self.selection.rect.y.max(0);
-                
+
                 if screen_w > 0 {
                     self.selection.rect.w = self.selection.rect.w.min(screen_w - self.selection.rect.x);
                 }
@@ -151,7 +148,6 @@ impl ScreenshotState {
         }
 
         self.mouse_pos = (start_x + dx, start_y + dy);
-        
     }
 
     pub fn end_drag(&mut self) {
@@ -176,42 +172,32 @@ impl ScreenshotState {
     }
 
     fn get_current_shape(&self) -> Option<Shape> {
-
         let from = self.drag_start.unwrap();
         let to = self.mouse_pos;
 
         match self.current_tool {
-            Tool::Arrow => {
-                return Some(Shape::Arrow { 
-                    from: from,
-                    to: to,
-                    color: self.current_color
-                });
-            }
-
-            Tool::Rectangle => {
-                return Some(Shape::Rectangle {
-                    rect: Self::rect_from_points(from, to),
-                    color: self.current_color 
-                });
-            }
-
-            Tool::Blur => {
-                return Some(Shape::Blur { rect: Self::rect_from_points(from, to) });
-            }
-            _ => {None}
+            Tool::Arrow => Some(Shape::Arrow {
+                from,
+                to,
+                color: self.current_color,
+            }),
+            Tool::Rectangle => Some(Shape::Rectangle {
+                rect: Self::rect_from_points(from, to),
+                color: self.current_color,
+            }),
+            Tool::Blur => Some(Shape::Blur {
+                rect: Self::rect_from_points(from, to),
+            }),
+            _ => None,
         }
-
     }
 
     fn resize_rect(&self, zone: &SelectionHitZone, x: i32, y: i32) -> Rect {
-
         let origin = self.drag_origin.unwrap();
         let (screen_w, screen_h) = self.screen_size;
         let mut rect = origin;
 
         match zone {
-            // Corners
             SelectionHitZone::NW => {
                 rect.x = (origin.x + x).max(0);
                 rect.y = (origin.y + y).max(0);
@@ -226,7 +212,6 @@ impl ScreenshotState {
                     rect.h = (screen_h - rect.y).max(1);
                 }
             }
-
             SelectionHitZone::NE => {
                 rect.y = (origin.y + y).max(0);
                 rect.w = (origin.w + x).max(1);
@@ -240,7 +225,6 @@ impl ScreenshotState {
                     rect.y = 0;
                 }
             }
-
             SelectionHitZone::SE => {
                 rect.w = (origin.w + x).max(1);
                 rect.h = (origin.h + y).max(1);
@@ -253,7 +237,6 @@ impl ScreenshotState {
                     rect.h = (screen_h - rect.y).max(1);
                 }
             }
-
             SelectionHitZone::SW => {
                 rect.x = (origin.x + x).max(0);
                 rect.w = (origin.w - x).max(1);
@@ -266,10 +249,7 @@ impl ScreenshotState {
                 if screen_h > 0 && rect.y + rect.h > screen_h {
                     rect.h = (screen_h - rect.y).max(1);
                 }
-
             }
-            
-            // Sides
             SelectionHitZone::N => {
                 rect.y = (origin.y + y).max(0);
                 rect.h = (origin.h - y).max(1);
@@ -278,7 +258,6 @@ impl ScreenshotState {
                     rect.y = 0;
                 }
             }
-
             SelectionHitZone::S => {
                 rect.h = (origin.h + y).max(1);
 
@@ -286,7 +265,6 @@ impl ScreenshotState {
                     rect.h = (screen_h - rect.y).max(1);
                 }
             }
-
             SelectionHitZone::W => {
                 rect.x = (origin.x + x).max(0);
                 rect.w = (origin.w - x).max(1);
@@ -295,7 +273,6 @@ impl ScreenshotState {
                     rect.x = 0;
                 }
             }
-
             SelectionHitZone::E => {
                 rect.w = (origin.w + x).max(1);
 
@@ -303,12 +280,10 @@ impl ScreenshotState {
                     rect.w = (screen_w - rect.x).max(1);
                 }
             }
-
             _ => {}
         }
 
         rect
-
     }
 
     fn rect_from_points(from: (i32, i32), to: (i32, i32)) -> Rect {
@@ -317,9 +292,8 @@ impl ScreenshotState {
         let x2 = from.0.max(to.0);
         let y2 = from.1.max(to.1);
 
-        Rect {x: x1, y: y1, w: x2 - x1, h: y2 - y1 }
+        Rect { x: x1, y: y1, w: x2 - x1, h: y2 - y1 }
     }
-
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -374,12 +348,7 @@ pub struct Rect {
 
 impl Rect {
     pub fn zero() -> Self {
-        Self {
-            x: 0,
-            y: 0,
-            w: 0,
-            h: 0,
-        }
+        Self { x: 0, y: 0, w: 0, h: 0 }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -394,7 +363,6 @@ impl Rect {
     pub fn as_f64(&self) -> (f64, f64, f64, f64) {
         (self.x as f64, self.y as f64, self.w as f64, self.h as f64)
     }
-
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -409,7 +377,6 @@ pub enum Tool {
 pub enum SelectionHitZone {
     Outside,
     Inside,
-
     N, S, E, W,
     NW, NE, SW, SE,
 }
@@ -426,14 +393,12 @@ pub enum Shape {
     Arrow {
         from: (i32, i32),
         to: (i32, i32),
-        color: (u8, u8, u8)
+        color: (u8, u8, u8),
     },
-    
     Rectangle {
         rect: Rect,
-        color: (u8, u8, u8)
+        color: (u8, u8, u8),
     },
-    
     Blur {
         rect: Rect,
     },
@@ -450,5 +415,84 @@ impl Shape {
                 rect.w > 5 && rect.h > 5
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn state_with_rect(rect: Rect, screen_size: (i32, i32)) -> ScreenshotState {
+        ScreenshotState {
+            selection: Selection::dragging(rect),
+            screen_size,
+            ..ScreenshotState::default()
+        }
+    }
+
+    #[test]
+    fn create_drag_clamps_current_point_at_top_left() {
+        let mut state = ScreenshotState::default();
+        state.set_screen_size((200, 200));
+        state.drag_start = Some((50, 60));
+        state.drag_origin = Some(Rect::zero());
+        state.drag_mode = Some(DragMode::Create);
+        state.selection = Selection::dragging(Rect::zero());
+
+        state.update_drag(-100, -100);
+
+        assert_eq!(*state.selection().rect(), Rect { x: 0, y: 0, w: 50, h: 60 });
+    }
+
+    #[test]
+    fn move_clamps_without_changing_size() {
+        let origin = Rect { x: 20, y: 30, w: 80, h: 60 };
+        let mut state = state_with_rect(origin, (200, 200));
+        state.drag_start = Some((40, 50));
+        state.drag_origin = Some(origin);
+        state.drag_mode = Some(DragMode::Move);
+
+        state.update_drag(500, 500);
+
+        assert_eq!(*state.selection().rect(), Rect { x: 120, y: 140, w: 80, h: 60 });
+    }
+
+    #[test]
+    fn resize_nw_clamps_to_screen_and_keeps_south_east_fixed() {
+        let origin = Rect { x: 20, y: 30, w: 100, h: 80 };
+        let mut state = state_with_rect(origin, (300, 300));
+        state.drag_start = Some((20, 30));
+        state.drag_origin = Some(origin);
+        state.drag_mode = Some(DragMode::Resize(SelectionHitZone::NW));
+
+        state.update_drag(-50, -60);
+
+        assert_eq!(*state.selection().rect(), Rect { x: 0, y: 0, w: 120, h: 110 });
+    }
+
+    #[test]
+    fn resize_w_cannot_cross_fixed_east_edge() {
+        let origin = Rect { x: 20, y: 30, w: 100, h: 80 };
+        let mut state = state_with_rect(origin, (300, 300));
+        state.drag_start = Some((20, 50));
+        state.drag_origin = Some(origin);
+        state.drag_mode = Some(DragMode::Resize(SelectionHitZone::W));
+
+        state.update_drag(200, 0);
+
+        assert_eq!(*state.selection().rect(), Rect { x: 119, y: 30, w: 1, h: 80 });
+    }
+
+    #[test]
+    fn resize_se_clamps_to_screen_edges() {
+        let origin = Rect { x: 20, y: 30, w: 100, h: 80 };
+        let mut state = state_with_rect(origin, (200, 180));
+        state.drag_start = Some((120, 110));
+        state.drag_origin = Some(origin);
+        state.drag_mode = Some(DragMode::Resize(SelectionHitZone::SE));
+
+        state.update_drag(500, 500);
+
+        assert_eq!(*state.selection().rect(), Rect { x: 20, y: 30, w: 180, h: 150 });
     }
 }
