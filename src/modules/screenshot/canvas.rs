@@ -42,11 +42,10 @@ impl Canvas {
 
     pub fn get_screen_size(&self) -> (i32, i32) {
         let surface = self.surface.borrow();
-        (surface.width(), surface.height())        
+        (surface.width(), surface.height())
     }
 
     pub fn save_shapshot(&self, state: &ScreenshotState) {
-
         if state.current_tool() != Tool::None
             && state.is_paused()
         {
@@ -68,12 +67,11 @@ impl Canvas {
         let cr = Context::new(&copy)?;
         cr.set_source_surface(surface, 0.0, 0.0)?;
         cr.paint()?;
-        
+
         Ok(copy)
     }
 
     pub fn apply_shape(&self, shape: &Shape) {
-        
         if shape.is_valid() {
             let surface = self.surface.borrow_mut();
             let cr = Context::new(&*surface)
@@ -83,5 +81,59 @@ impl Canvas {
             self.history.borrow_mut().pop();
         }
     }
+}
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::modules::screenshot::state::Rect;
+
+    fn test_canvas(width: i32, height: i32) -> Canvas {
+        let surface = ImageSurface::create(cairo::Format::ARgb32, width, height).unwrap();
+        let cr = Context::new(&surface).unwrap();
+        cr.set_source_rgb(1.0, 1.0, 1.0);
+        cr.paint().unwrap();
+
+        Canvas {
+            surface: Rc::new(RefCell::new(surface)),
+            history: RefCell::new(Vec::new()),
+        }
+    }
+
+    fn surface_png(canvas: &Canvas) -> Vec<u8> {
+        let surface = canvas.surface.borrow();
+        let mut bytes = Vec::new();
+        surface.write_to_png(&mut bytes).unwrap();
+        bytes
+    }
+
+    fn valid_rectangle() -> Shape {
+        Shape::Rectangle {
+            rect: Rect { x: 20, y: 20, w: 20, h: 20 },
+            color: (0, 0, 0),
+        }
+    }
+
+    #[test]
+    fn applying_valid_shape_creates_undo_entry() {
+        let canvas = test_canvas(100, 100);
+
+        canvas.apply_shape(&valid_rectangle());
+
+        assert_eq!(canvas.history.borrow().len(), 1);
+    }
+
+    #[test]
+    fn undo_restores_surface_pixels() {
+        let canvas = test_canvas(100, 100);
+        let before = surface_png(&canvas);
+
+        canvas.apply_shape(&valid_rectangle());
+        let after = surface_png(&canvas);
+        assert_ne!(after, before);
+
+        canvas.restore_snapshot();
+
+        assert_eq!(surface_png(&canvas), before);
+    }
 }
