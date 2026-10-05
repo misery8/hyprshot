@@ -9,6 +9,8 @@ use gtk4::prelude::*;
 use crate::action::{AppAction, ScreenshotAction};
 use crate::modules::screenshot::state::{Rect, Tool};
 
+const TOOLBAR_GAP: i32 = 8;
+
 macro_rules! create_exlusive_toolbuttons {
     (
         tx = $tx:expr,
@@ -220,36 +222,39 @@ impl Toolbar {
 
     pub fn update_position(&self, rect: &Rect, screen_size: (i32, i32)) {
         let allocation = self.container.allocation();
-        let toolbar_w = allocation.width();
-        let toolbar_h = allocation.height();
+        let position = calculate_position(
+            rect,
+            screen_size,
+            (allocation.width(), allocation.height()),
+        );
 
-        let (screen_w, screen_h) = screen_size;
-
-        let right_x = (rect.x + rect.w - toolbar_w)
-            .clamp(0, screen_w - toolbar_w);
-
-        let center_x = (rect.x + (rect.w - toolbar_w) / 2)
-            .clamp(0, screen_w - toolbar_w);
-
-        let bottom_y = rect.y + rect.h + 8;
-
-        if bottom_y + toolbar_h <= screen_h {
-            self.container.set_margin_start(right_x);
-            self.container.set_margin_top(bottom_y);
-            return;
-        }
-
-        let top_y = rect.y - toolbar_h - 8;
-
-        if top_y >= 8 {
-            self.container.set_margin_start(center_x);
-            self.container.set_margin_top(top_y);
-            return;
-        }
-
-        self.container.set_margin_start(center_x);
-        self.container.set_margin_top(8);
+        self.container.set_margin_start(position.0);
+        self.container.set_margin_top(position.1);
     }
+}
+
+fn calculate_position(
+    rect: &Rect,
+    screen_size: (i32, i32),
+    toolbar_size: (i32, i32),
+) -> (i32, i32) {
+    let (screen_w, screen_h) = screen_size;
+    let (toolbar_w, toolbar_h) = toolbar_size;
+    let max_x = (screen_w - toolbar_w).max(0);
+
+    let right_x = (rect.x + rect.w - toolbar_w).clamp(0, max_x);
+    let center_x = (rect.x + (rect.w - toolbar_w) / 2).clamp(0, max_x);
+    let bottom_y = rect.y + rect.h + TOOLBAR_GAP;
+
+    if bottom_y + toolbar_h <= screen_h {
+        return (right_x, bottom_y);
+    }
+
+    let top_y = rect.y - toolbar_h - TOOLBAR_GAP;
+    (
+        center_x,
+        if top_y >= TOOLBAR_GAP { top_y } else { TOOLBAR_GAP },
+    )
 }
 
 fn default_button(icon: &str) -> Button {
