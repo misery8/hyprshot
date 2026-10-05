@@ -33,7 +33,6 @@ impl Dispatch<wl_data_source::WlDataSource, ()> for State {
         _conn: &Connection,
         _qhandle: &QueueHandle<Self>,
     ) {
-        
         match event {
             wl_data_source::Event::Send { mime_type, fd } => {
                 if let Some(buf) = state.data.get_mut(&mime_type) {
@@ -48,12 +47,9 @@ impl Dispatch<wl_data_source::WlDataSource, ()> for State {
                                 let mut pfd = [PollFd::new(fd, PollFlags::POLLOUT)];
                                 let _ = poll(&mut pfd, PollTimeout::NONE);
                             },
-                            Err(_) => {
-                                break;
-                            }
+                            Err(_) => break,
                         }
                     }
-
                 }
             }
             wl_data_source::Event::Cancelled => {
@@ -66,7 +62,6 @@ impl Dispatch<wl_data_source::WlDataSource, ()> for State {
 }
 
 wayland_client::delegate_noop!(State: ignore wl_seat::WlSeat);
-
 wayland_client::delegate_dispatch!(State: [wl_registry::WlRegistry: wayland_client::globals::GlobalListContents] => State);
 wayland_client::delegate_dispatch!(State: [wl_data_device::WlDataDevice: ()] => State);
 wayland_client::delegate_dispatch!(State: [wl_data_device_manager::WlDataDeviceManager: ()] => State);
@@ -77,21 +72,19 @@ enum LazyData {
 }
 
 impl LazyData {
-    
     fn get(&mut self) -> Vec<u8> {
         match std::mem::replace(self, LazyData::Ready(Vec::new())) {
             LazyData::Ready(v) => v,
-            LazyData::Lazy(f) => f()
+            LazyData::Lazy(f) => f(),
         }
     }
 }
 
 fn main() -> Result<()> {
-    
     let mut png_data = Vec::new();
     std::io::stdin().read_to_end(&mut png_data)
         .context("Failed to read stdin")?;
-    
+
     let mut data_map = HashMap::new();
     data_map.insert("image/png".to_string(), LazyData::Ready(png_data.clone()));
     data_map.insert(
@@ -100,7 +93,6 @@ fn main() -> Result<()> {
             let img = image::load_from_memory(&png_data).unwrap();
             let mut bmp = Cursor::new(Vec::with_capacity(png_data.capacity()));
             img.write_to(&mut bmp, image::ImageFormat::Bmp).unwrap();
-
             bmp.into_inner()
         }))
     );
@@ -123,10 +115,8 @@ fn main() -> Result<()> {
         .context("Failed to bind WlSeat")?;
 
     let source = manager.create_data_source(&qh, ());
-    {        
-        for mime in state.data.keys() {
-            source.offer(mime.clone());
-        }
+    for mime in state.data.keys() {
+        source.offer(mime.clone());
     }
 
     let device = manager.get_data_device(&seat, &qh, ());
@@ -138,4 +128,25 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ready_data_can_be_read_more_than_once() {
+        let mut data = LazyData::Ready(vec![1, 2, 3]);
+
+        assert_eq!(data.get(), vec![1, 2, 3]);
+        assert_eq!(data.get(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn lazy_data_is_cached_after_first_read() {
+        let mut data = LazyData::Lazy(Box::new(|| vec![4, 5, 6]));
+
+        assert_eq!(data.get(), vec![4, 5, 6]);
+        assert_eq!(data.get(), vec![4, 5, 6]);
+    }
 }
