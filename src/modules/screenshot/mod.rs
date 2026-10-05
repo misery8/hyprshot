@@ -27,7 +27,7 @@ pub fn run(app: &gtk4::Application) {
         Canvas::from_screenshot()
             .expect("Failed to create ")
     );
-    
+
     let screen_size = canvas.get_screen_size();
     state.set_screen_size(screen_size);
 
@@ -88,9 +88,8 @@ fn handle_action(
                         }
                     }
                 }
-                ScreenshotAction::DragBegin(x, y) => { 
+                ScreenshotAction::DragBegin(x, y) => {
                     s.begin_drag(x, y);
-                    canvas.save_shapshot(&*s);
                 },
                 ScreenshotAction::DragUpdate(x, y) => {
                     s.update_drag(x, y);
