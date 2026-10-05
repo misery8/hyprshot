@@ -11,11 +11,10 @@ use crate::modules::screenshot::state::{Rect, Tool};
 
 const TOOLBAR_GAP: i32 = 8;
 
-macro_rules! create_exlusive_toolbuttons {
+macro_rules! create_exclusive_toolbuttons {
     (
         tx = $tx:expr,
         container = $container:expr,
-        active_by_default = $default_tool:expr,
         tools = [$( ($icon_path:expr, $tool_variant:path) ),* $(,)?]
     ) => {{
         let mut tool_buttons = Vec::new();
@@ -29,40 +28,40 @@ macro_rules! create_exlusive_toolbuttons {
                 .child(&icon)
                 .focusable(false)
                 .can_focus(false)
-                .width_request(36).height_request(36)
+                .width_request(36)
+                .height_request(36)
                 .build();
 
-            tool_buttons.push((button.clone(), $tool_variant));
+            tool_buttons.push((button, $tool_variant));
         )*
 
-        let tx = $tx.clone();
-        let tool_buttons = Rc::new(tool_buttons);
+        let weak_buttons: Vec<_> = tool_buttons
+            .iter()
+            .map(|(button, _)| button.downgrade())
+            .collect();
 
-        for (button, variant) in tool_buttons.iter() {
+        for (button, variant) in &tool_buttons {
             let current_variant = *variant;
+            let other_buttons = weak_buttons.clone();
+            let tx = $tx.clone();
 
-            button.connect_clicked(clone!(
-                #[strong] tool_buttons,
-                #[strong] tx,
-                #[strong] button,
-                move |_| {
-                    if button.is_active() {
-                        for (other_button, _) in tool_buttons.iter() {
-                            if !other_button.eq(&button) && other_button.is_active() {
+            button.connect_clicked(move |button| {
+                if button.is_active() {
+                    for other_button in &other_buttons {
+                        if let Some(other_button) = other_button.upgrade() {
+                            if !other_button.eq(button) && other_button.is_active() {
                                 other_button.set_active(false);
                             }
                         }
-                        let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetTool(current_variant)));
-                    } else {
-                        let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetTool(Tool::None)));
                     }
+                    let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetTool(current_variant)));
+                } else {
+                    let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetTool(Tool::None)));
                 }
-            ));
+            });
 
             $container.append(button);
         }
-
-        tool_buttons
     }};
 }
 
@@ -94,10 +93,9 @@ impl Toolbar {
     }
 
     fn setup_drawing_tools(&self, tx: Sender<AppAction>) {
-        let _tool_buttons = create_exlusive_toolbuttons! {
+        create_exclusive_toolbuttons! {
             tx = tx,
             container = self.container,
-            active_by_default = Tool::None,
             tools = [
                 ("/io/github/misery8/hyprshot/icons/symbolic/diagonal-arrow-symbolic.svg", Tool::Arrow),
                 ("/io/github/misery8/hyprshot/icons/symbolic/rectangle-symbolic.svg", Tool::Rectangle),
