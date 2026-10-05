@@ -10,21 +10,24 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Install system dependencies
+      - name: Install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgtk-4-dev \
-            libgtk4-layer-shell-dev \
-            libgdk-pixbuf-2.0-dev \
-            libcairo2-dev \
-            libglib2.0-dev \
-            libwayland-dev \
-            pkg-config
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+          pacman -Syu --noconfirm \
+            base-devel \
+            git \
+            rust \
+            cargo \
+            gtk4 \
+            gtk4-layer-shell \
+            gdk-pixbuf2 \
+            cairo \
+            glib2 \
+            wayland \
+            pkgconf
+      - uses: actions/checkout@v4
       - name: Run tests
         run: cargo test --locked
       - name: Check release build
