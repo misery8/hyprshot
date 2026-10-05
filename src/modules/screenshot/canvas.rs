@@ -129,4 +129,16 @@ mod tests {
 
         assert_eq!(surface_png(&canvas), before);
     }
+
+    #[test]
+    fn undo_snapshot_is_smaller_than_canvas_for_local_shape() {
+        let canvas = test_canvas(100, 100);
+
+        canvas.apply_shape(&valid_rectangle());
+
+        let history = canvas.history.borrow();
+        let snapshot = &history[0];
+        assert!(snapshot.width() < 100);
+        assert!(snapshot.height() < 100);
+    }
 }
