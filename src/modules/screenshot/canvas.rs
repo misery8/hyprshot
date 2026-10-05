@@ -5,12 +5,34 @@ use cairo::{Context, ImageSurface};
 use gdk4::ffi::gdk_cairo_set_source_pixbuf;
 use glib::translate::ToGlibPtr;
 
-use crate::modules::screenshot::{render, state::Shape};
+use crate::modules::screenshot::{
+    render,
+    state::{Rect, Shape},
+};
+
+const STROKE_PADDING: i32 = 2;
+const ARROW_PADDING: i32 = 16;
+
+#[derive(Debug)]
+struct HistoryEntry {
+    rect: Rect,
+    surface: ImageSurface,
+}
+
+impl HistoryEntry {
+    fn width(&self) -> i32 {
+        self.surface.width()
+    }
+
+    fn height(&self) -> i32 {
+        self.surface.height()
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Canvas {
     pub surface: Rc<RefCell<ImageSurface>>,
-    history: RefCell<Vec<ImageSurface>>,
+    history: RefCell<Vec<HistoryEntry>>,
 }
 
 impl Canvas {
@@ -46,18 +68,30 @@ impl Canvas {
     }
 
     pub fn restore_snapshot(&self) {
-        if let Some(previous_surface) = self.history.borrow_mut().pop() {
-            *self.surface.borrow_mut() = previous_surface;
-        }
-    }
+        let Some(entry) = self.history.borrow_mut().pop() else {
+            return;
+        };
 
-    pub fn clone_surface(surface: &ImageSurface) -> Result<ImageSurface, Error> {
-        let copy = ImageSurface::create(surface.format(), surface.width(), surface.height())?;
-        let cr = Context::new(&copy)?;
-        cr.set_source_surface(surface, 0.0, 0.0)?;
-        cr.paint()?;
+        let surface = self.surface.borrow_mut();
+        let cr = Context::new(&*surface)
+            .expect("Failed to create undo context");
 
-        Ok(copy)
+        cr.save().expect("Failed to save undo context");
+        cr.rectangle(
+            entry.rect.x as f64,
+            entry.rect.y as f64,
+            entry.rect.w as f64,
+            entry.rect.h as f64,
+        );
+        cr.clip();
+        cr.set_operator(cairo::Operator::Source);
+        cr.set_source_surface(
+            &entry.surface,
+            entry.rect.x as f64,
+            entry.rect.y as f64,
+        ).expect("Failed to set undo surface");
+        cr.paint().expect("Failed to restore undo region");
+        cr.restore().expect("Failed to restore undo context");
     }
 
     pub fn apply_shape(&self, shape: &Shape) {
@@ -66,20 +100,89 @@ impl Canvas {
         }
 
         let surface = self.surface.borrow_mut();
-        if let Ok(backup) = Self::clone_surface(&surface) {
-            self.history.borrow_mut().push(backup);
+        let Some(rect) = Self::shape_bounds(shape, surface.width(), surface.height()) else {
+            return;
+        };
+
+        if let Ok(snapshot) = Self::clone_region(&surface, rect) {
+            self.history.borrow_mut().push(HistoryEntry {
+                rect,
+                surface: snapshot,
+            });
         }
 
         let cr = Context::new(&*surface)
             .expect("Failed to bake context");
         render::draw_shape(&*surface, &cr, shape);
     }
+
+    fn clone_region(surface: &ImageSurface, rect: Rect) -> Result<ImageSurface, Error> {
+        let copy = ImageSurface::create(surface.format(), rect.w, rect.h)?;
+        let cr = Context::new(&copy)?;
+        cr.set_operator(cairo::Operator::Source);
+        cr.set_source_surface(surface, -rect.x as f64, -rect.y as f64)?;
+        cr.paint()?;
+
+        Ok(copy)
+    }
+
+    fn shape_bounds(shape: &Shape, surface_w: i32, surface_h: i32) -> Option<Rect> {
+        let rect = match shape {
+            Shape::Rectangle { rect, .. } => Self::expand_rect(*rect, STROKE_PADDING),
+            Shape::Blur { rect } => *rect,
+            Shape::Arrow { from, to, .. } => {
+                let left = from.0.min(to.0) - ARROW_PADDING;
+                let top = from.1.min(to.1) - ARROW_PADDING;
+                let right = from.0.max(to.0) + ARROW_PADDING + 1;
+                let bottom = from.1.max(to.1) + ARROW_PADDING + 1;
+
+                Rect {
+                    x: left,
+                    y: top,
+                    w: right - left,
+                    h: bottom - top,
+                }
+            }
+        };
+
+        Self::clamp_rect(rect, surface_w, surface_h)
+    }
+
+    fn expand_rect(rect: Rect, padding: i32) -> Rect {
+        Rect {
+            x: rect.x - padding,
+            y: rect.y - padding,
+            w: rect.w + padding * 2,
+            h: rect.h + padding * 2,
+        }
+    }
+
+    fn clamp_rect(rect: Rect, surface_w: i32, surface_h: i32) -> Option<Rect> {
+        if surface_w <= 0 || surface_h <= 0 {
+            return None;
+        }
+
+        let left = rect.x.clamp(0, surface_w);
+        let top = rect.y.clamp(0, surface_h);
+        let right = (rect.x + rect.w).clamp(0, surface_w);
+        let bottom = (rect.y + rect.h).clamp(0, surface_h);
+
+        if right <= left || bottom <= top {
+            return None;
+        }
+
+        Some(Rect {
+            x: left,
+            y: top,
+            w: right - left,
+            h: bottom - top,
+        })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modules::screenshot::state::Rect;
 
     fn test_canvas(width: i32, height: i32) -> Canvas {
         let surface = ImageSurface::create(cairo::Format::ARgb32, width, height).unwrap();
