@@ -4,7 +4,7 @@ use std::sync::mpsc::Sender;
 
 use glib::clone;
 use gtk4::{Box, Button, CssProvider, DrawingArea, Grid, Image, Overlay, Popover, ToggleButton};
-use gtk4::{prelude::*};
+use gtk4::prelude::*;
 
 use crate::action::{AppAction, ScreenshotAction};
 use crate::modules::screenshot::state::{Rect, Tool};
@@ -19,7 +19,6 @@ macro_rules! create_exlusive_toolbuttons {
         let mut tool_buttons = Vec::new();
 
         $(
-            
             let icon = Image::from_resource($icon_path);
             icon.set_opacity(1.0);
             icon.set_pixel_size(24);
@@ -30,7 +29,7 @@ macro_rules! create_exlusive_toolbuttons {
                 .can_focus(false)
                 .width_request(36).height_request(36)
                 .build();
-                        
+
             tool_buttons.push((button.clone(), $tool_variant));
         )*
 
@@ -39,7 +38,7 @@ macro_rules! create_exlusive_toolbuttons {
 
         for (button, variant) in tool_buttons.iter() {
             let current_variant = *variant;
-                        
+
             button.connect_clicked(clone!(
                 #[strong] tool_buttons,
                 #[strong] tx,
@@ -62,7 +61,6 @@ macro_rules! create_exlusive_toolbuttons {
         }
 
         tool_buttons
-
     }};
 }
 
@@ -160,7 +158,7 @@ impl Toolbar {
         popover.set_child(Some(&grid));
 
         button.connect_clicked(clone!(#[strong] popover, move |_| popover.popup()));
-       
+
         self.container.append(&button);
     }
 
@@ -170,7 +168,6 @@ impl Toolbar {
         drawing_area: &DrawingArea,
         popover: &Popover,
     ) -> Grid {
-
         let grid = Grid::builder()
             .row_spacing(2)
             .column_spacing(2)
@@ -205,15 +202,15 @@ impl Toolbar {
                 #[strong] drawing_area,
                 #[weak] popover,
                 move |_| {
-                let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetColor(red, green, blue)));
-                
-                indicator_color.set((red, green, blue));
-                drawing_area.queue_draw();
-                popover.popdown();
-            }));
+                    let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetColor(red, green, blue)));
+
+                    indicator_color.set((red, green, blue));
+                    drawing_area.queue_draw();
+                    popover.popdown();
+                }
+            ));
 
             grid.attach(&color_button, (index % 4) as i32, (index / 4) as i32, 1, 1);
-
         }
 
         grid
@@ -253,20 +250,61 @@ impl Toolbar {
         self.container.set_margin_start(center_x);
         self.container.set_margin_top(8);
     }
-
 }
 
 fn default_button(icon: &str) -> Button {
-    
     let icon = Image::from_resource(icon);
     icon.set_opacity(0.6);
     icon.set_pixel_size(20);
 
-    let button = Button::builder()
+    Button::builder()
         .width_request(36).height_request(36)
         .focusable(false)
         .child(&icon)
-        .build();
-        
-    button
+        .build()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn toolbar_uses_selection_bottom_right_when_it_fits() {
+        let rect = Rect { x: 50, y: 40, w: 100, h: 80 };
+
+        assert_eq!(
+            calculate_position(&rect, (300, 300), (80, 36)),
+            (70, 128),
+        );
+    }
+
+    #[test]
+    fn toolbar_falls_back_to_selection_top_center() {
+        let rect = Rect { x: 50, y: 200, w: 100, h: 80 };
+
+        assert_eq!(
+            calculate_position(&rect, (300, 300), (80, 36)),
+            (60, 156),
+        );
+    }
+
+    #[test]
+    fn toolbar_uses_top_margin_when_selection_has_no_room_above() {
+        let rect = Rect { x: 0, y: 0, w: 300, h: 300 };
+
+        assert_eq!(
+            calculate_position(&rect, (300, 300), (80, 36)),
+            (110, 8),
+        );
+    }
+
+    #[test]
+    fn toolbar_position_is_safe_when_toolbar_is_wider_than_screen() {
+        let rect = Rect { x: 0, y: 50, w: 100, h: 50 };
+
+        assert_eq!(
+            calculate_position(&rect, (100, 200), (120, 36)),
+            (0, 108),
+        );
+    }
 }
