@@ -72,10 +72,18 @@ enum LazyData {
 }
 
 impl LazyData {
-    fn get(&mut self) -> Vec<u8> {
-        match std::mem::replace(self, LazyData::Ready(Vec::new())) {
-            LazyData::Ready(v) => v,
-            LazyData::Lazy(f) => f(),
+    fn get(&mut self) -> &[u8] {
+        if matches!(self, LazyData::Lazy(_)) {
+            let lazy = std::mem::replace(self, LazyData::Ready(Vec::new()));
+            let LazyData::Lazy(build) = lazy else {
+                unreachable!();
+            };
+            *self = LazyData::Ready(build());
+        }
+
+        match self {
+            LazyData::Ready(data) => data.as_slice(),
+            LazyData::Lazy(_) => unreachable!(),
         }
     }
 }
