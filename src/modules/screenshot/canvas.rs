@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc, result::Result};
 
-use anyhow::{Error, Ok};
+use anyhow::Error;
 use cairo::{Context, ImageSurface};
 use gdk4::ffi::gdk_cairo_set_source_pixbuf;
 use glib::translate::ToGlibPtr;
@@ -19,6 +19,7 @@ struct HistoryEntry {
     surface: ImageSurface,
 }
 
+#[cfg(test)]
 impl HistoryEntry {
     fn width(&self) -> i32 {
         self.surface.width()
@@ -29,7 +30,7 @@ impl HistoryEntry {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Canvas {
     pub surface: Rc<RefCell<ImageSurface>>,
     history: RefCell<Vec<HistoryEntry>>,
@@ -104,7 +105,7 @@ impl Canvas {
             return;
         };
 
-        if let Ok(snapshot) = Self::clone_region(&surface, rect) {
+        if let Result::Ok(snapshot) = Self::clone_region(&surface, rect) {
             self.history.borrow_mut().push(HistoryEntry {
                 rect,
                 surface: snapshot,
