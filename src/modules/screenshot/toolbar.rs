@@ -12,10 +12,11 @@ use crate::modules::screenshot::state::{Rect, Tool};
 const TOOLBAR_GAP: i32 = 8;
 const BUTTON_SIZE: i32 = 36;
 const TOOL_ICON_SIZE: i32 = 24;
-const COLOR_INDICATOR_SIZE: i32 = 12;
+const COLOR_INDICATOR_SIZE: i32 = 10;
 const COLOR_SWATCH_SIZE: i32 = 24;
 const ACTIVE_TOOL_CLASS: &str = "suggested-action";
 const COLOR_INDICATOR_CLASS: &str = "color-indicator";
+const TOOLBAR_CLASS: &str = "hyprshot-toolbar";
 
 const ARROW_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/diagonal-arrow-symbolic.svg";
 const ARROW_ACTIVE_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/diagonal-arrow-active-symbolic.svg";
@@ -72,6 +73,10 @@ fn set_tool_button_icon(button: &Button, tool: Tool, active: bool) {
     }
 }
 
+fn toolbar_geometry_css() -> &'static str {
+    ".hyprshot-toolbar { border-radius: 10px; padding: 4px; }"
+}
+
 fn color_indicator_css((red, green, blue): (u8, u8, u8)) -> String {
     format!(
         ".{COLOR_INDICATOR_CLASS} {{ \
@@ -99,7 +104,12 @@ impl Toolbar {
             .hexpand(false)
             .vexpand(false)
             .build();
-        container.add_css_class("linked");
+
+        let toolbar_provider = CssProvider::new();
+        toolbar_provider.load_from_data(toolbar_geometry_css());
+        container.add_css_class(TOOLBAR_CLASS);
+        container.style_context()
+            .add_provider(&toolbar_provider, gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION);
 
         let toolbar = Self { container };
 
@@ -176,8 +186,8 @@ impl Toolbar {
             .height_request(COLOR_INDICATOR_SIZE)
             .halign(gtk4::Align::End)
             .valign(gtk4::Align::End)
-            .margin_end(2)
-            .margin_bottom(2)
+            .margin_end(1)
+            .margin_bottom(0)
             .can_target(false)
             .build();
         color_indicator.add_css_class(COLOR_INDICATOR_CLASS);
@@ -347,6 +357,16 @@ mod tests {
             assert_ne!(normal_icon, active_icon);
             assert!(active_icon.contains("active"));
         }
+    }
+
+    #[test]
+    fn toolbar_geometry_css_stays_theme_neutral() {
+        let css = toolbar_geometry_css();
+
+        assert!(css.contains("border-radius: 10px"));
+        assert!(css.contains("padding: 4px"));
+        assert!(!css.contains("background"));
+        assert!(!css.contains("color:"));
     }
 
     #[test]
