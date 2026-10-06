@@ -11,19 +11,22 @@ use crate::modules::screenshot::state::{Rect, Tool};
 
 const TOOLBAR_GAP: i32 = 8;
 
-fn tool_button_visual_state(active: bool) -> gtk4::StateFlags {
+fn normalize_tool_button_state(active: bool, state: gtk4::StateFlags) -> gtk4::StateFlags {
     if active {
-        gtk4::StateFlags::SELECTED
+        state - gtk4::StateFlags::PRELIGHT
     } else {
-        gtk4::StateFlags::empty()
+        state
     }
 }
 
-fn sync_tool_button_visual_state(button: &ToggleButton) {
-    if tool_button_visual_state(button.is_active()).contains(gtk4::StateFlags::SELECTED) {
-        button.set_state_flags(gtk4::StateFlags::SELECTED, false);
-    } else {
-        button.unset_state_flags(gtk4::StateFlags::SELECTED);
+fn sync_tool_button_hover_state(button: &ToggleButton) {
+    let current = button.state_flags();
+    let normalized = normalize_tool_button_state(button.is_active(), current);
+
+    if current.contains(gtk4::StateFlags::PRELIGHT)
+        && !normalized.contains(gtk4::StateFlags::PRELIGHT)
+    {
+        button.unset_state_flags(gtk4::StateFlags::PRELIGHT);
     }
 }
 
@@ -48,7 +51,9 @@ macro_rules! create_exclusive_toolbuttons {
                 .height_request(36)
                 .build();
 
-            button.connect_toggled(sync_tool_button_visual_state);
+            button.connect_state_flags_changed(|button, _| {
+                sync_tool_button_hover_state(button);
+            });
             tool_buttons.push((button, $tool_variant));
         )*
 
