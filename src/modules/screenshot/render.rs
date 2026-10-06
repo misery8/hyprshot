@@ -4,6 +4,8 @@ use crate::modules::screenshot::state::{Rect, Shape};
 
 const ARROW_LINE_WIDTH: f64 = 2.75;
 const RECTANGLE_LINE_WIDTH: f64 = 2.25;
+const TEXT_FONT_SIZE: f64 = 22.0;
+const TEXT_BOUNDS_PADDING: i32 = 4;
 
 fn set_color(cr: &Context, color: (u8, u8, u8), alpha: f64) {
     cr.set_source_rgba(
@@ -12,6 +14,11 @@ fn set_color(cr: &Context, color: (u8, u8, u8), alpha: f64) {
         color.2 as f64 / 255.0,
         alpha,
     );
+}
+
+fn configure_text_font(cr: &Context) {
+    cr.select_font_face("Sans", cairo::FontSlant::Normal, cairo::FontWeight::Bold);
+    cr.set_font_size(TEXT_FONT_SIZE);
 }
 
 pub fn draw_selection(
@@ -37,6 +44,7 @@ pub fn draw_shape(surface: &ImageSurface, cr: &Context, shape: &Shape) {
     match shape {
         Shape::Arrow { from, to, color } => draw_arrow(cr, *from, *to, *color),
         Shape::Rectangle { rect, color } => draw_rectangle(cr, rect, *color),
+        Shape::Text { position, text, color } => draw_text(cr, *position, text, *color),
         Shape::Blur { rect } => draw_blur(surface, cr, rect),
     }
 }
@@ -86,6 +94,66 @@ pub fn draw_rectangle(
     cr.set_line_width(RECTANGLE_LINE_WIDTH);
     cr.rectangle(x, y, w, h);
     cr.stroke().expect("Cairo stroke failed");
+}
+
+pub fn draw_text(
+    cr: &Context,
+    position: (i32, i32),
+    text: &str,
+    color: (u8, u8, u8),
+) {
+    if text.is_empty() {
+        return;
+    }
+
+    set_color(cr, color, 1.0);
+    configure_text_font(cr);
+    cr.move_to(position.0 as f64, position.1 as f64);
+    cr.show_text(text).expect("Cairo text render failed");
+}
+
+pub fn draw_text_preview(
+    cr: &Context,
+    position: (i32, i32),
+    text: &str,
+    color: (u8, u8, u8),
+) {
+    draw_text(cr, position, text, color);
+
+    configure_text_font(cr);
+    let advance = cr.text_extents(text)
+        .map(|extents| extents.x_advance())
+        .unwrap_or(0.0);
+
+    set_color(cr, color, 1.0);
+    cr.set_line_width(1.5);
+    let caret_x = position.0 as f64 + advance + 1.0;
+    cr.move_to(caret_x, position.1 as f64 - TEXT_FONT_SIZE);
+    cr.line_to(caret_x, position.1 as f64 + 3.0);
+    cr.stroke().expect("Cairo caret render failed");
+}
+
+pub fn text_bounds(cr: &Context, position: (i32, i32), text: &str) -> Option<Rect> {
+    if text.is_empty() {
+        return None;
+    }
+
+    configure_text_font(cr);
+    let extents = cr.text_extents(text).ok()?;
+
+    let left = (position.0 as f64 + extents.x_bearing()).floor() as i32 - TEXT_BOUNDS_PADDING;
+    let top = (position.1 as f64 + extents.y_bearing()).floor() as i32 - TEXT_BOUNDS_PADDING;
+    let right = (position.0 as f64 + extents.x_bearing() + extents.width()).ceil() as i32
+        + TEXT_BOUNDS_PADDING;
+    let bottom = (position.1 as f64 + extents.y_bearing() + extents.height()).ceil() as i32
+        + TEXT_BOUNDS_PADDING;
+
+    Some(Rect {
+        x: left,
+        y: top,
+        w: (right - left).max(1),
+        h: (bottom - top).max(1),
+    })
 }
 
 pub fn draw_blur(surface: &ImageSurface, cr: &Context, rect: &Rect) {
