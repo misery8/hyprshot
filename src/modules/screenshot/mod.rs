@@ -11,7 +11,7 @@ mod ui;
 
 use self::state::ScreenshotState;
 use self::ui::ScreenshotWidgets;
-use crate::action::{AppAction, ScreenshotAction};
+use crate::action::{AppAction, GlobalAction, ScreenshotAction};
 use crate::capture::clipboard;
 use crate::common::cursor;
 use crate::modules::screenshot::canvas::Canvas;
@@ -61,6 +61,10 @@ fn handle_action(
     let mut need_redraw = false;
 
     match action {
+        AppAction::Global(GlobalAction::Quit) => {
+            s.cancel_text();
+            app.quit();
+        }
         AppAction::Screenshot(sub_action) => {
             match sub_action {
                 ScreenshotAction::SetTool(tool) => s.set_tool(tool),
@@ -111,11 +115,6 @@ fn handle_action(
                 ScreenshotAction::TextCommit => {
                     if let Some(shape) = s.commit_text() {
                         canvas.apply_shape(&shape);
-                    }
-                }
-                ScreenshotAction::Escape => {
-                    if !s.cancel_text() {
-                        app.quit();
                     }
                 }
                 ScreenshotAction::Save => {
