@@ -190,8 +190,8 @@ impl Toolbar {
             .width_request(BUTTON_SIZE)
             .height_request(BUTTON_SIZE)
             .focusable(false)
-            .child(&overlay)
             .build();
+        button.set_child(Some(&overlay));
         button.set_popover(Some(&popover));
 
         self.container.append(&button);
