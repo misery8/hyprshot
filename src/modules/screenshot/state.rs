@@ -384,6 +384,15 @@ mod tests {
         }
     }
 
+    fn paused_state_with_rect(rect: Rect, screen_size: (i32, i32)) -> ScreenshotState {
+        ScreenshotState {
+            selection: Selection::finalized(rect),
+            paused: true,
+            screen_size,
+            ..ScreenshotState::default()
+        }
+    }
+
     #[test]
     fn create_drag_clamps_current_point_at_top_left() {
         let mut state = ScreenshotState::default();
@@ -448,5 +457,38 @@ mod tests {
         state.update_drag(500, 500);
 
         assert_eq!(*state.selection().rect(), Rect { x: 20, y: 30, w: 180, h: 150 });
+    }
+
+    #[test]
+    fn text_tool_click_starts_text_input_inside_selection() {
+        let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
+        let mut state = paused_state_with_rect(rect, (200, 200));
+        state.set_tool(Tool::Text);
+
+        state.begin_drag(40, 50);
+
+        let input = state.text_input().expect("text input should start");
+        assert_eq!(input.position(), (40, 50));
+        assert_eq!(input.text(), "");
+    }
+
+    #[test]
+    fn text_input_supports_edit_commit_and_cancel() {
+        let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
+        let mut state = paused_state_with_rect(rect, (200, 200));
+        state.set_tool(Tool::Text);
+        state.begin_drag(40, 50);
+
+        state.append_text('Ж');
+        state.append_text('a');
+        state.backspace_text();
+
+        let shape = state.commit_text().expect("non-empty text should commit");
+        assert!(matches!(shape, Shape::Text { ref text, .. } if text == "Ж"));
+        assert!(state.text_input().is_none());
+
+        state.begin_drag(60, 70);
+        assert!(state.cancel_text());
+        assert!(state.text_input().is_none());
     }
 }
