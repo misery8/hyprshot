@@ -14,6 +14,7 @@ pub struct ScreenshotState {
     drag_origin: Option<Rect>,
     drag_mode: Option<DragMode>,
     current_shape: Option<Shape>,
+    text_input: Option<TextInput>,
     screen_size: (i32, i32),
 }
 
@@ -29,6 +30,7 @@ impl Default for ScreenshotState {
             drag_origin: None,
             drag_mode: None,
             current_shape: None,
+            text_input: None,
             screen_size: (0, 0),
         }
     }
@@ -39,6 +41,7 @@ impl ScreenshotState {
     pub fn is_paused(&self) -> bool { self.paused }
     pub fn mouse_pos(&self) -> (i32, i32) { self.mouse_pos }
     pub fn current_shape(&self) -> Option<&Shape> { self.current_shape.as_ref() }
+    pub fn text_input(&self) -> Option<&TextInput> { self.text_input.as_ref() }
     pub fn screen_size(&self) -> (i32, i32) { self.screen_size }
 
     pub fn set_screen_size(&mut self, size: (i32, i32)) {
@@ -52,6 +55,9 @@ impl ScreenshotState {
     }
 
     pub fn set_tool(&mut self, tool: Tool) {
+        if self.current_tool == Tool::Text && tool != Tool::Text {
+            self.text_input = None;
+        }
         self.current_tool = tool;
     }
 
@@ -61,6 +67,22 @@ impl ScreenshotState {
 
     pub fn begin_drag(&mut self, x: i32, y: i32) {
         self.mouse_pos = (x, y);
+
+        if self.current_tool == Tool::Text {
+            if self.paused
+                && self.selection.is_active()
+                && self.selection.rect.contains((x, y))
+            {
+                self.current_shape = None;
+                self.drag_start = None;
+                self.text_input = Some(TextInput {
+                    position: (x, y),
+                    text: String::new(),
+                    color: self.current_color,
+                });
+            }
+            return;
+        }
 
         if self.current_tool != Tool::None {
             if self.paused
@@ -134,6 +156,35 @@ impl ScreenshotState {
         self.mouse_pos = pos;
     }
 
+    pub fn append_text(&mut self, ch: char) {
+        if let Some(input) = self.text_input.as_mut() {
+            input.text.push(ch);
+        }
+    }
+
+    pub fn backspace_text(&mut self) {
+        if let Some(input) = self.text_input.as_mut() {
+            input.text.pop();
+        }
+    }
+
+    pub fn cancel_text(&mut self) -> bool {
+        self.text_input.take().is_some()
+    }
+
+    pub fn commit_text(&mut self) -> Option<Shape> {
+        let input = self.text_input.take()?;
+        if input.text.trim().is_empty() {
+            return None;
+        }
+
+        Some(Shape::Text {
+            position: input.position,
+            text: input.text,
+            color: input.color,
+        })
+    }
+
     pub fn export_selection(&self, original_surface: &ImageSurface) -> anyhow::Result<Vec<u8>> {
         export_selection(original_surface, self)
     }
@@ -155,13 +206,26 @@ impl ScreenshotState {
             Tool::Blur => Some(Shape::Blur {
                 rect: Self::rect_from_points(from, to),
             }),
-            Tool::None => None,
+            Tool::Text | Tool::None => None,
         }
     }
 
     fn rect_from_points(from: (i32, i32), to: (i32, i32)) -> Rect {
         Rect::from_points(from, to)
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct TextInput {
+    position: (i32, i32),
+    text: String,
+    color: (u8, u8, u8),
+}
+
+impl TextInput {
+    pub fn position(&self) -> (i32, i32) { self.position }
+    pub fn text(&self) -> &str { &self.text }
+    pub fn color(&self) -> (u8, u8, u8) { self.color }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -324,6 +388,7 @@ pub enum Tool {
     None,
     Arrow,
     Rectangle,
+    Text,
     Blur,
 }
 
@@ -342,7 +407,7 @@ pub enum DragMode {
     Resize(SelectionHitZone),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Shape {
     Arrow {
         from: (i32, i32),
@@ -351,6 +416,11 @@ pub enum Shape {
     },
     Rectangle {
         rect: Rect,
+        color: (u8, u8, u8),
+    },
+    Text {
+        position: (i32, i32),
+        text: String,
         color: (u8, u8, u8),
     },
     Blur {
@@ -368,6 +438,7 @@ impl Shape {
             Shape::Rectangle { rect, .. } | Shape::Blur { rect } => {
                 rect.w > 5 && rect.h > 5
             }
+            Shape::Text { text, .. } => !text.trim().is_empty(),
         }
     }
 }
