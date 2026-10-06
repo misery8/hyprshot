@@ -8,6 +8,10 @@ const TEXT_FONT_SIZE: f64 = 22.0;
 const TEXT_BOUNDS_PADDING: i32 = 4;
 const CARET_OUTLINE_WIDTH: f64 = 3.5;
 const CARET_INNER_WIDTH: f64 = 1.5;
+const SELECTION_DIM_ALPHA: f64 = 0.6;
+const SELECTION_LINE_WIDTH: f64 = 1.5;
+const SELECTION_DASH: [f64; 2] = [6.0, 6.0];
+const SELECTION_HANDLE_SIZE: f64 = 8.0;
 
 fn set_color(cr: &Context, color: (u8, u8, u8), alpha: f64) {
     cr.set_source_rgba(
@@ -23,23 +27,59 @@ fn configure_text_font(cr: &Context) {
     cr.set_font_size(TEXT_FONT_SIZE);
 }
 
+fn selection_handle_positions(rect: &Rect) -> [(f64, f64); 8] {
+    let (x, y, w, h) = rect.as_f64();
+    let right = x + w;
+    let bottom = y + h;
+    let center_x = x + w / 2.0;
+    let center_y = y + h / 2.0;
+
+    [
+        (x, y),
+        (center_x, y),
+        (right, y),
+        (x, center_y),
+        (right, center_y),
+        (x, bottom),
+        (center_x, bottom),
+        (right, bottom),
+    ]
+}
+
 pub fn draw_selection(
     cr: &Context,
     rect: &Rect,
+    viewport: (f64, f64),
 ) {
     let (x, y, w, h) = rect.as_f64();
 
-    cr.rectangle(x, y, w, h);
-    cr.set_fill_rule(cairo::FillRule::EvenOdd);
-
-    cr.fill().expect("Cairo fill failed");
+    cr.save().expect("Failed to save selection context");
 
     cr.set_operator(cairo::Operator::Over);
+    cr.set_source_rgba(0.0, 0.0, 0.0, SELECTION_DIM_ALPHA);
+    cr.rectangle(0.0, 0.0, viewport.0, viewport.1);
+    cr.rectangle(x, y, w, h);
+    cr.set_fill_rule(cairo::FillRule::EvenOdd);
+    cr.fill().expect("Cairo selection overlay fill failed");
 
     cr.set_source_rgba(1.0, 1.0, 1.0, 1.0);
-    cr.set_line_width(1.0);
-    cr.rectangle(x + 0.5, y + 0.5, w - 1.0, h - 1.0);
-    cr.stroke().expect("Cairo stroke failed");
+    cr.set_line_width(SELECTION_LINE_WIDTH);
+    cr.set_dash(&SELECTION_DASH, 0.0);
+    cr.rectangle(x, y, w, h);
+    cr.stroke().expect("Cairo selection stroke failed");
+
+    let half = SELECTION_HANDLE_SIZE / 2.0;
+    for (handle_x, handle_y) in selection_handle_positions(rect) {
+        cr.rectangle(
+            handle_x - half,
+            handle_y - half,
+            SELECTION_HANDLE_SIZE,
+            SELECTION_HANDLE_SIZE,
+        );
+        cr.fill().expect("Cairo selection handle fill failed");
+    }
+
+    cr.restore().expect("Failed to restore selection context");
 }
 
 pub fn draw_shape(surface: &ImageSurface, cr: &Context, shape: &Shape) {
@@ -215,4 +255,29 @@ pub fn draw_blur(surface: &ImageSurface, cr: &Context, rect: &Rect) {
     cr.paint().expect("Failed to paint");
 
     cr.restore().expect("Failed to restore state");
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn selection_handles_match_demo_positions() {
+        let rect = Rect { x: 10, y: 20, w: 100, h: 80 };
+
+        assert_eq!(
+            selection_handle_positions(&rect),
+            [
+                (10.0, 20.0),
+                (60.0, 20.0),
+                (110.0, 20.0),
+                (10.0, 60.0),
+                (110.0, 60.0),
+                (10.0, 100.0),
+                (60.0, 100.0),
+                (110.0, 100.0),
+            ]
+        );
+    }
 }

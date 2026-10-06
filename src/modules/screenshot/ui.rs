@@ -131,14 +131,16 @@ impl ScreenshotWidgets {
             cr.set_source_surface(&*surface, 0.0, 0.0).unwrap();
             cr.paint().unwrap();
 
-            cr.set_source_rgba(0.0, 0.0, 0.0, 0.6);
-            cr.rectangle(0.0, 0.0, area.width() as f64, area.height() as f64);
-
-            if state.selection().is_active() {            
-                render::draw_selection(cr, state.selection().rect());
+            if state.selection().is_active() {
+                render::draw_selection(
+                    cr,
+                    state.selection().rect(),
+                    (area.width() as f64, area.height() as f64),
+                );
+            } else {
+                cr.set_source_rgba(0.0, 0.0, 0.0, 0.6);
+                cr.paint().expect("Cairo dim overlay paint failed");
             }
-
-            cr.fill().unwrap();
 
             if let Some(shape) = state.current_shape() {
                 render::draw_shape(&surface, cr, shape);
