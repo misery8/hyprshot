@@ -1,6 +1,6 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::collections::VecDeque;
 use std::rc::Rc;
-use std::sync::mpsc;
 
 use gtk4::prelude::*;
 
@@ -18,8 +18,64 @@ use crate::capture::clipboard;
 use crate::common::cursor;
 use crate::modules::screenshot::canvas::Canvas;
 
+type ActionDispatch = Box<dyn FnMut(AppAction)>;
+
+struct ActionQueue {
+    actions: RefCell<VecDeque<AppAction>>,
+    scheduled: Cell<bool>,
+    dispatch: RefCell<Option<ActionDispatch>>,
+}
+
+#[derive(Clone)]
+pub(super) struct ActionSender {
+    queue: Rc<ActionQueue>,
+}
+
+impl ActionSender {
+    fn new() -> Self {
+        Self {
+            queue: Rc::new(ActionQueue {
+                actions: RefCell::new(VecDeque::new()),
+                scheduled: Cell::new(false),
+                dispatch: RefCell::new(None),
+            }),
+        }
+    }
+
+    fn set_dispatch<F>(&self, dispatch: F)
+    where
+        F: FnMut(AppAction) + 'static,
+    {
+        *self.queue.dispatch.borrow_mut() = Some(Box::new(dispatch));
+    }
+
+    pub(super) fn send(&self, action: AppAction) {
+        self.queue.actions.borrow_mut().push_back(action);
+
+        if self.queue.scheduled.replace(true) {
+            return;
+        }
+
+        let queue = self.queue.clone();
+        glib::idle_add_local_once(move || {
+            loop {
+                let action = queue.actions.borrow_mut().pop_front();
+                let Some(action) = action else {
+                    break;
+                };
+
+                if let Some(dispatch) = queue.dispatch.borrow_mut().as_mut() {
+                    dispatch(action);
+                }
+            }
+
+            queue.scheduled.set(false);
+        });
+    }
+}
+
 pub fn run(app: &gtk4::Application) {
-    let (tx, rx) = mpsc::channel::<AppAction>();
+    let tx = ActionSender::new();
     let app_handle = app.clone();
     let mut state = ScreenshotState::default();
 
@@ -42,14 +98,14 @@ pub fn run(app: &gtk4::Application) {
         )
     );
 
-    crate::modules::screenshot::events::init_events(tx, &widgets);
-
-    glib::idle_add_local(move || {
-        while let Ok(action) = rx.try_recv() {
+    let weak_widgets = Rc::downgrade(&widgets);
+    tx.set_dispatch(move |action| {
+        if let Some(widgets) = weak_widgets.upgrade() {
             handle_action(&app_handle, action, &state, &widgets, &canvas);
         }
-        glib::ControlFlow::Continue
     });
+
+    crate::modules::screenshot::events::init_events(tx, &widgets);
 }
 
 fn handle_action(
