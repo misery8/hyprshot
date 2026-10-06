@@ -11,6 +11,22 @@ use crate::modules::screenshot::state::{Rect, Tool};
 
 const TOOLBAR_GAP: i32 = 8;
 
+fn tool_button_visual_state(active: bool) -> gtk4::StateFlags {
+    if active {
+        gtk4::StateFlags::SELECTED
+    } else {
+        gtk4::StateFlags::empty()
+    }
+}
+
+fn sync_tool_button_visual_state(button: &ToggleButton) {
+    if tool_button_visual_state(button.is_active()).contains(gtk4::StateFlags::SELECTED) {
+        button.set_state_flags(gtk4::StateFlags::SELECTED, false);
+    } else {
+        button.unset_state_flags(gtk4::StateFlags::SELECTED);
+    }
+}
+
 macro_rules! create_exclusive_toolbuttons {
     (
         tx = $tx:expr,
@@ -32,6 +48,7 @@ macro_rules! create_exclusive_toolbuttons {
                 .height_request(36)
                 .build();
 
+            button.connect_toggled(sync_tool_button_visual_state);
             tool_buttons.push((button, $tool_variant));
         )*
 
