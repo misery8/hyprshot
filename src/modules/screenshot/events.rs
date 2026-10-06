@@ -7,7 +7,7 @@ use gtk4::{
     Shortcut, CallbackAction, ShortcutController, ShortcutTrigger, prelude::*
 };
 
-use crate::action::{AppAction, ScreenshotAction};
+use crate::action::{AppAction, GlobalAction, ScreenshotAction};
 use crate::modules::screenshot::ui::ScreenshotWidgets;
 
 pub fn init_events(tx: Sender<AppAction>, widgets: &ScreenshotWidgets) {
@@ -21,7 +21,7 @@ pub fn init_events(tx: Sender<AppAction>, widgets: &ScreenshotWidgets) {
     ));
 
     drag.connect_drag_update(clone!(#[strong] tx, move |_g, dx, dy| {
-            let _ = tx.send(AppAction::Screenshot(ScreenshotAction::DragUpdate(dx as i32, dy as i32)));
+        let _ = tx.send(AppAction::Screenshot(ScreenshotAction::DragUpdate(dx as i32, dy as i32)));
         }
     ));
 
@@ -76,7 +76,7 @@ pub fn init_events(tx: Sender<AppAction>, widgets: &ScreenshotWidgets) {
         }
 
         if key == Key::Escape {
-            let _ = tx.send(AppAction::Screenshot(ScreenshotAction::Escape));
+            let _ = tx.send(AppAction::Global(GlobalAction::Quit));
             return glib::Propagation::Stop;
         }
 
