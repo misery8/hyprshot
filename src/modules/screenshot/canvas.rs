@@ -101,7 +101,7 @@ impl Canvas {
         }
 
         let surface = self.surface.borrow_mut();
-        let Some(rect) = Self::shape_bounds(shape, surface.width(), surface.height()) else {
+        let Some(rect) = Self::shape_bounds(shape, &surface) else {
             return;
         };
 
@@ -113,7 +113,7 @@ impl Canvas {
         }
 
         let cr = Context::new(&*surface)
-            .expect("Failed to bake context");
+            .expect("Failed to create bake context");
         render::draw_shape(&*surface, &cr, shape);
     }
 
@@ -127,7 +127,10 @@ impl Canvas {
         Ok(copy)
     }
 
-    fn shape_bounds(shape: &Shape, surface_w: i32, surface_h: i32) -> Option<Rect> {
+    fn shape_bounds(shape: &Shape, surface: &ImageSurface) -> Option<Rect> {
+        let surface_w = surface.width();
+        let surface_h = surface.height();
+
         let rect = match shape {
             Shape::Rectangle { rect, .. } => Self::expand_rect(*rect, STROKE_PADDING),
             Shape::Blur { rect } => *rect,
@@ -143,6 +146,10 @@ impl Canvas {
                     w: right - left,
                     h: bottom - top,
                 }
+            }
+            Shape::Text { position, text, .. } => {
+                let cr = Context::new(surface).ok()?;
+                render::text_bounds(&cr, *position, text)?
             }
         };
 
@@ -211,6 +218,14 @@ mod tests {
         }
     }
 
+    fn valid_text() -> Shape {
+        Shape::Text {
+            position: (20, 40),
+            text: "Hello".to_string(),
+            color: (0, 0, 0),
+        }
+    }
+
     #[test]
     fn applying_valid_shape_creates_undo_entry() {
         let canvas = test_canvas(100, 100);
@@ -244,5 +259,17 @@ mod tests {
         let snapshot = &history[0];
         assert!(snapshot.width() < 100);
         assert!(snapshot.height() < 100);
+    }
+
+    #[test]
+    fn text_shape_uses_regional_undo_snapshot() {
+        let canvas = test_canvas(200, 100);
+
+        canvas.apply_shape(&valid_text());
+
+        let history = canvas.history.borrow();
+        assert_eq!(history.len(), 1);
+        assert!(history[0].width() < 200);
+        assert!(history[0].height() < 100);
     }
 }
