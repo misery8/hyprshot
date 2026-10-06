@@ -272,6 +272,12 @@ mod tests {
     use super::*;
 
     #[test]
+    fn active_tool_button_has_persistent_selected_state() {
+        assert!(tool_button_visual_state(true).contains(gtk4::StateFlags::SELECTED));
+        assert!(tool_button_visual_state(false).is_empty());
+    }
+
+    #[test]
     fn toolbar_uses_selection_bottom_right_when_it_fits() {
         let rect = Rect { x: 50, y: 40, w: 100, h: 80 };
 
