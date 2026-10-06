@@ -1,15 +1,14 @@
-use std::{cell::RefCell, rc::Rc, sync::mpsc::Sender};
+use std::{cell::RefCell, rc::Rc};
 
 use gtk4::{Application, ApplicationWindow, DrawingArea, Overlay};
 use gtk4::prelude::*;
 use gtk4_layer_shell::LayerShell;
 
-use crate::action::AppAction;
+use crate::modules::screenshot::ActionSender;
 use crate::modules::screenshot::canvas::Canvas;
 use crate::modules::screenshot::render;
 use crate::modules::screenshot::state::ScreenshotState;
 use crate::modules::screenshot::toolbar::Toolbar;
-
 
 pub struct ScreenshotWidgets {
     pub window: ApplicationWindow,
@@ -18,27 +17,19 @@ pub struct ScreenshotWidgets {
 }
 
 impl ScreenshotWidgets {
-    pub fn build (
+    pub fn build(
         app: &Application,
-        tx: Sender<AppAction>,
+        tx: ActionSender,
         state: Rc<RefCell<ScreenshotState>>,
         canvas: Rc<Canvas>,
     ) -> Self {
-
-        // let da_size = {
-        //     let surf = canvas.surface.borrow();
-        //     (surf.width(), surf.height())
-        // };
-
         let drawing_area = DrawingArea::builder()
-            // .content_width(da_size.0)
-            // .content_height(da_size.1)
             .hexpand(true)
             .vexpand(true)
             .build();
 
         Self::setup_render_loop(&drawing_area, state, canvas);
-        
+
         let toolbar = Toolbar::new(tx);
         let overlay = Self::setup_layout(&drawing_area, toolbar.widget());
 
@@ -48,7 +39,7 @@ impl ScreenshotWidgets {
             .title("Hyprshot")
             .decorated(false)
             .build();
-        
+
         window.init_layer_shell();
         window.set_layer(gtk4_layer_shell::Layer::Overlay);
         window.set_exclusive_zone(-1);
@@ -65,7 +56,6 @@ impl ScreenshotWidgets {
     }
 
     fn setup_layout(da: &DrawingArea, toolbar_widget: &gtk4::Box) -> Overlay {
-
         let overlay = Overlay::new();
         overlay.set_vexpand(true);
         overlay.set_hexpand(true);
@@ -83,14 +73,14 @@ impl ScreenshotWidgets {
         da.set_draw_func(move |area, cr, _, _| {
             let state = state.borrow();
             let surface = canvas.surface.borrow();
-            
+
             cr.set_source_surface(&*surface, 0.0, 0.0).unwrap();
             cr.paint().unwrap();
 
             cr.set_source_rgba(0.0, 0.0, 0.0, 0.6);
             cr.rectangle(0.0, 0.0, area.width() as f64, area.height() as f64);
 
-            if state.selection().is_active() {            
+            if state.selection().is_active() {
                 render::draw_selection(cr, state.selection().rect());
             }
 
@@ -101,7 +91,4 @@ impl ScreenshotWidgets {
             }
         });
     }
-
 }
-
- 
