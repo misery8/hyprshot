@@ -12,11 +12,20 @@ use crate::modules::screenshot::state::{Rect, Tool};
 const TOOLBAR_GAP: i32 = 8;
 const BUTTON_SIZE: i32 = 36;
 const TOOL_ICON_SIZE: i32 = 24;
-const ACTION_ICON_SIZE: i32 = 20;
 const COLOR_INDICATOR_SIZE: i32 = 12;
 const COLOR_SWATCH_SIZE: i32 = 24;
 const ACTIVE_TOOL_CLASS: &str = "suggested-action";
 const COLOR_INDICATOR_CLASS: &str = "color-indicator";
+
+const ARROW_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/diagonal-arrow-symbolic.svg";
+const ARROW_ACTIVE_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/diagonal-arrow-active-symbolic.svg";
+const RECTANGLE_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/rectangle-symbolic.svg";
+const RECTANGLE_ACTIVE_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/rectangle-active-symbolic.svg";
+const TEXT_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/text-symbolic.svg";
+const BLUR_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/drop-water-symbolic.svg";
+const BLUR_ACTIVE_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/drop-water-active-symbolic.svg";
+const UNDO_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/undo-symbolic.svg";
+const PALETTE_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/palette-symbolic.svg";
 
 fn next_tool(current: Tool, clicked: Tool) -> Tool {
     if current == clicked {
@@ -26,72 +35,51 @@ fn next_tool(current: Tool, clicked: Tool) -> Tool {
     }
 }
 
+fn tool_icon_resources(tool: Tool) -> Option<(&'static str, &'static str)> {
+    match tool {
+        Tool::Arrow => Some((ARROW_ICON, ARROW_ACTIVE_ICON)),
+        Tool::Rectangle => Some((RECTANGLE_ICON, RECTANGLE_ACTIVE_ICON)),
+        Tool::Blur => Some((BLUR_ICON, BLUR_ACTIVE_ICON)),
+        Tool::None => None,
+    }
+}
+
+fn icon_image(resource: &str) -> Image {
+    let icon = Image::from_resource(resource);
+    icon.set_opacity(1.0);
+    icon.set_pixel_size(TOOL_ICON_SIZE);
+    icon
+}
+
+fn tool_button(tool: Tool) -> Button {
+    let (icon_resource, _) = tool_icon_resources(tool)
+        .expect("annotation tool must have icon resources");
+    let icon = icon_image(icon_resource);
+
+    Button::builder()
+        .child(&icon)
+        .focusable(false)
+        .can_focus(false)
+        .width_request(BUTTON_SIZE)
+        .height_request(BUTTON_SIZE)
+        .build()
+}
+
+fn set_tool_button_icon(button: &Button, tool: Tool, active: bool) {
+    if let Some((normal_icon, active_icon)) = tool_icon_resources(tool) {
+        let icon = icon_image(if active { active_icon } else { normal_icon });
+        button.set_child(Some(&icon));
+    }
+}
+
 fn color_indicator_css((red, green, blue): (u8, u8, u8)) -> String {
     format!(
         ".{COLOR_INDICATOR_CLASS} {{ \
             background-color: rgb({red}, {green}, {blue}); \
-            border-radius: 999px; \
+            border-radius: 0px; \
             border: 1px solid rgba(255, 255, 255, 0.85); \
         }}"
     )
-}
-
-macro_rules! create_exclusive_toolbuttons {
-    (
-        tx = $tx:expr,
-        container = $container:expr,
-        tools = [$( ($icon_path:expr, $tool_variant:path) ),* $(,)?]
-    ) => {{
-        let mut tool_buttons = Vec::new();
-
-        $(
-            let icon = Image::from_resource($icon_path);
-            icon.set_opacity(1.0);
-            icon.set_pixel_size(TOOL_ICON_SIZE);
-
-            let button = Button::builder()
-                .child(&icon)
-                .focusable(false)
-                .can_focus(false)
-                .width_request(BUTTON_SIZE)
-                .height_request(BUTTON_SIZE)
-                .build();
-
-            tool_buttons.push((button, $tool_variant));
-        )*
-
-        let active_tool = Rc::new(Cell::new(Tool::None));
-        let weak_buttons: Vec<_> = tool_buttons
-            .iter()
-            .map(|(button, tool)| (button.downgrade(), *tool))
-            .collect();
-
-        for (button, variant) in &tool_buttons {
-            let current_variant = *variant;
-            let active_tool = active_tool.clone();
-            let buttons = weak_buttons.clone();
-            let tx = $tx.clone();
-
-            button.connect_clicked(move |_| {
-                let tool = next_tool(active_tool.get(), current_variant);
-                active_tool.set(tool);
-
-                for (button, button_tool) in &buttons {
-                    if let Some(button) = button.upgrade() {
-                        if *button_tool == tool {
-                            button.add_css_class(ACTIVE_TOOL_CLASS);
-                        } else {
-                            button.remove_css_class(ACTIVE_TOOL_CLASS);
-                        }
-                    }
-                }
-
-                let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetTool(tool)));
-            });
-
-            $container.append(button);
-        }
-    }};
 }
 
 #[derive(Debug, Clone)]
@@ -111,6 +99,7 @@ impl Toolbar {
             .hexpand(false)
             .vexpand(false)
             .build();
+        container.add_css_class("linked");
 
         let toolbar = Self { container };
 
@@ -122,25 +111,54 @@ impl Toolbar {
     }
 
     fn setup_drawing_tools(&self, tx: Sender<AppAction>) {
-        let tool_group = Box::new(gtk4::Orientation::Horizontal, 0);
-        tool_group.add_css_class("linked");
-        tool_group.set_focusable(false);
+        let tool_buttons = vec![
+            (tool_button(Tool::Arrow), Tool::Arrow),
+            (tool_button(Tool::Rectangle), Tool::Rectangle),
+            (tool_button(Tool::Blur), Tool::Blur),
+        ];
 
-        create_exclusive_toolbuttons! {
-            tx = tx,
-            container = tool_group,
-            tools = [
-                ("/io/github/misery8/hyprshot/icons/symbolic/diagonal-arrow-symbolic.svg", Tool::Arrow),
-                ("/io/github/misery8/hyprshot/icons/symbolic/rectangle-symbolic.svg", Tool::Rectangle),
-                ("/io/github/misery8/hyprshot/icons/symbolic/drop-water-symbolic.svg", Tool::Blur),
-            ]
-        };
+        let active_tool = Rc::new(Cell::new(Tool::None));
+        let weak_buttons: Vec<_> = tool_buttons
+            .iter()
+            .map(|(button, tool)| (button.downgrade(), *tool))
+            .collect();
 
-        self.container.append(&tool_group);
+        for (button, variant) in &tool_buttons {
+            let current_variant = *variant;
+            let active_tool = active_tool.clone();
+            let buttons = weak_buttons.clone();
+            let tx = tx.clone();
+
+            button.connect_clicked(move |_| {
+                let tool = next_tool(active_tool.get(), current_variant);
+                active_tool.set(tool);
+
+                for (button, button_tool) in &buttons {
+                    if let Some(button) = button.upgrade() {
+                        let is_active = *button_tool == tool;
+
+                        if is_active {
+                            button.add_css_class(ACTIVE_TOOL_CLASS);
+                        } else {
+                            button.remove_css_class(ACTIVE_TOOL_CLASS);
+                        }
+
+                        set_tool_button_icon(&button, *button_tool, is_active);
+                    }
+                }
+
+                let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetTool(tool)));
+            });
+        }
+
+        self.container.append(&tool_buttons[0].0);
+        self.container.append(&tool_buttons[1].0);
+        self.container.append(&default_button(TEXT_ICON));
+        self.container.append(&tool_buttons[2].0);
     }
 
     fn setup_undo_button(&self, tx: Sender<AppAction>) {
-        let button = default_button("/io/github/misery8/hyprshot/icons/symbolic/undo-symbolic.svg");
+        let button = default_button(UNDO_ICON);
         button.connect_clicked(clone!(#[strong] tx, move |_| {
             let _ = tx.send(AppAction::Screenshot(ScreenshotAction::Undo));
         }));
@@ -166,8 +184,7 @@ impl Toolbar {
         color_indicator.style_context()
             .add_provider(&indicator_provider, gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION);
 
-        let icon = Image::from_resource("/io/github/misery8/hyprshot/icons/symbolic/palette-symbolic.svg");
-        icon.set_pixel_size(TOOL_ICON_SIZE);
+        let icon = icon_image(PALETTE_ICON);
 
         let overlay = Overlay::builder()
             .child(&icon)
@@ -295,10 +312,8 @@ fn calculate_position(
     )
 }
 
-fn default_button(icon: &str) -> Button {
-    let icon = Image::from_resource(icon);
-    icon.set_opacity(0.6);
-    icon.set_pixel_size(ACTION_ICON_SIZE);
+fn default_button(icon_resource: &str) -> Button {
+    let icon = icon_image(icon_resource);
 
     Button::builder()
         .width_request(BUTTON_SIZE)
@@ -325,11 +340,22 @@ mod tests {
     }
 
     #[test]
+    fn active_tool_icons_have_dedicated_resources() {
+        for tool in [Tool::Arrow, Tool::Rectangle, Tool::Blur] {
+            let (normal_icon, active_icon) = tool_icon_resources(tool).unwrap();
+
+            assert_ne!(normal_icon, active_icon);
+            assert!(active_icon.contains("active"));
+        }
+    }
+
+    #[test]
     fn color_indicator_css_tracks_selected_color() {
         let css = color_indicator_css((12, 34, 56));
 
         assert!(css.contains("rgb(12, 34, 56)"));
         assert!(css.contains("color-indicator"));
+        assert!(css.contains("border-radius: 0px"));
     }
 
     #[test]
