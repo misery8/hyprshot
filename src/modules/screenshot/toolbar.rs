@@ -12,7 +12,8 @@ use crate::modules::screenshot::state::{Rect, Tool};
 const TOOLBAR_GAP: i32 = 8;
 const BUTTON_SIZE: i32 = 36;
 const TOOL_ICON_SIZE: i32 = 24;
-const COLOR_INDICATOR_SIZE: i32 = 10;
+const PALETTE_ICON_SIZE: i32 = 28;
+const COLOR_INDICATOR_SIZE: i32 = 12;
 const COLOR_SWATCH_SIZE: i32 = 24;
 const ACTIVE_TOOL_CLASS: &str = "suggested-action";
 const COLOR_INDICATOR_CLASS: &str = "color-indicator";
@@ -23,6 +24,7 @@ const ARROW_ACTIVE_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/diag
 const RECTANGLE_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/rectangle-symbolic.svg";
 const RECTANGLE_ACTIVE_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/rectangle-active-symbolic.svg";
 const TEXT_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/text-symbolic.svg";
+const TEXT_ACTIVE_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/text-active-symbolic.svg";
 const BLUR_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/drop-water-symbolic.svg";
 const BLUR_ACTIVE_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/drop-water-active-symbolic.svg";
 const UNDO_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/undo-symbolic.svg";
@@ -40,16 +42,21 @@ fn tool_icon_resources(tool: Tool) -> Option<(&'static str, &'static str)> {
     match tool {
         Tool::Arrow => Some((ARROW_ICON, ARROW_ACTIVE_ICON)),
         Tool::Rectangle => Some((RECTANGLE_ICON, RECTANGLE_ACTIVE_ICON)),
+        Tool::Text => Some((TEXT_ICON, TEXT_ACTIVE_ICON)),
         Tool::Blur => Some((BLUR_ICON, BLUR_ACTIVE_ICON)),
         Tool::None => None,
     }
 }
 
-fn icon_image(resource: &str) -> Image {
+fn icon_image_sized(resource: &str, size: i32) -> Image {
     let icon = Image::from_resource(resource);
     icon.set_opacity(1.0);
-    icon.set_pixel_size(TOOL_ICON_SIZE);
+    icon.set_pixel_size(size);
     icon
+}
+
+fn icon_image(resource: &str) -> Image {
+    icon_image_sized(resource, TOOL_ICON_SIZE)
 }
 
 fn tool_button(tool: Tool) -> Button {
@@ -124,6 +131,7 @@ impl Toolbar {
         let tool_buttons = vec![
             (tool_button(Tool::Arrow), Tool::Arrow),
             (tool_button(Tool::Rectangle), Tool::Rectangle),
+            (tool_button(Tool::Text), Tool::Text),
             (tool_button(Tool::Blur), Tool::Blur),
         ];
 
@@ -161,10 +169,9 @@ impl Toolbar {
             });
         }
 
-        self.container.append(&tool_buttons[0].0);
-        self.container.append(&tool_buttons[1].0);
-        self.container.append(&default_button(TEXT_ICON));
-        self.container.append(&tool_buttons[2].0);
+        for (button, _) in &tool_buttons {
+            self.container.append(button);
+        }
     }
 
     fn setup_undo_button(&self, tx: Sender<AppAction>) {
@@ -194,7 +201,7 @@ impl Toolbar {
         color_indicator.style_context()
             .add_provider(&indicator_provider, gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION);
 
-        let icon = icon_image(PALETTE_ICON);
+        let icon = icon_image_sized(PALETTE_ICON, PALETTE_ICON_SIZE);
 
         let overlay = Overlay::builder()
             .child(&icon)
@@ -351,7 +358,7 @@ mod tests {
 
     #[test]
     fn active_tool_icons_have_dedicated_resources() {
-        for tool in [Tool::Arrow, Tool::Rectangle, Tool::Blur] {
+        for tool in [Tool::Arrow, Tool::Rectangle, Tool::Text, Tool::Blur] {
             let (normal_icon, active_icon) = tool_icon_resources(tool).unwrap();
 
             assert_ne!(normal_icon, active_icon);
