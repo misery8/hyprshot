@@ -3,30 +3,20 @@ use std::rc::Rc;
 use std::sync::mpsc::Sender;
 
 use glib::clone;
-use gtk4::{Box, Button, CssProvider, DrawingArea, Grid, Image, Overlay, Popover, ToggleButton};
+use gtk4::{Box, Button, CssProvider, DrawingArea, Grid, Image, Overlay, Popover};
 use gtk4::prelude::*;
 
 use crate::action::{AppAction, ScreenshotAction};
 use crate::modules::screenshot::state::{Rect, Tool};
 
 const TOOLBAR_GAP: i32 = 8;
+const ACTIVE_TOOL_CLASS: &str = "suggested-action";
 
-fn normalize_tool_button_state(active: bool, state: gtk4::StateFlags) -> gtk4::StateFlags {
-    if active {
-        state - gtk4::StateFlags::PRELIGHT
+fn next_tool(current: Tool, clicked: Tool) -> Tool {
+    if current == clicked {
+        Tool::None
     } else {
-        state
-    }
-}
-
-fn sync_tool_button_hover_state(button: &ToggleButton) {
-    let current = button.state_flags();
-    let normalized = normalize_tool_button_state(button.is_active(), current);
-
-    if current.contains(gtk4::StateFlags::PRELIGHT)
-        && !normalized.contains(gtk4::StateFlags::PRELIGHT)
-    {
-        button.unset_state_flags(gtk4::StateFlags::PRELIGHT);
+        clicked
     }
 }
 
@@ -43,7 +33,7 @@ macro_rules! create_exclusive_toolbuttons {
             icon.set_opacity(1.0);
             icon.set_pixel_size(24);
 
-            let button = ToggleButton::builder()
+            let button = Button::builder()
                 .child(&icon)
                 .focusable(false)
                 .can_focus(false)
@@ -51,35 +41,36 @@ macro_rules! create_exclusive_toolbuttons {
                 .height_request(36)
                 .build();
 
-            button.connect_state_flags_changed(|button, _| {
-                sync_tool_button_hover_state(button);
-            });
             tool_buttons.push((button, $tool_variant));
         )*
 
+        let active_tool = Rc::new(Cell::new(Tool::None));
         let weak_buttons: Vec<_> = tool_buttons
             .iter()
-            .map(|(button, _)| button.downgrade())
+            .map(|(button, tool)| (button.downgrade(), *tool))
             .collect();
 
         for (button, variant) in &tool_buttons {
             let current_variant = *variant;
-            let other_buttons = weak_buttons.clone();
+            let active_tool = active_tool.clone();
+            let buttons = weak_buttons.clone();
             let tx = $tx.clone();
 
-            button.connect_clicked(move |button| {
-                if button.is_active() {
-                    for other_button in &other_buttons {
-                        if let Some(other_button) = other_button.upgrade() {
-                            if !other_button.eq(button) && other_button.is_active() {
-                                other_button.set_active(false);
-                            }
+            button.connect_clicked(move |_| {
+                let tool = next_tool(active_tool.get(), current_variant);
+                active_tool.set(tool);
+
+                for (button, button_tool) in &buttons {
+                    if let Some(button) = button.upgrade() {
+                        if *button_tool == tool {
+                            button.add_css_class(ACTIVE_TOOL_CLASS);
+                        } else {
+                            button.remove_css_class(ACTIVE_TOOL_CLASS);
                         }
                     }
-                    let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetTool(current_variant)));
-                } else {
-                    let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetTool(Tool::None)));
                 }
+
+                let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetTool(tool)));
             });
 
             $container.append(button);
@@ -294,21 +285,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn active_tool_button_suppresses_hover_state() {
-        let state = normalize_tool_button_state(
-            true,
-            gtk4::StateFlags::CHECKED | gtk4::StateFlags::PRELIGHT,
-        );
-
-        assert!(state.contains(gtk4::StateFlags::CHECKED));
-        assert!(!state.contains(gtk4::StateFlags::PRELIGHT));
+    fn clicking_inactive_tool_selects_it() {
+        assert_eq!(next_tool(Tool::None, Tool::Arrow), Tool::Arrow);
+        assert_eq!(next_tool(Tool::Rectangle, Tool::Arrow), Tool::Arrow);
     }
 
     #[test]
-    fn inactive_tool_button_keeps_hover_state() {
-        let state = normalize_tool_button_state(false, gtk4::StateFlags::PRELIGHT);
-
-        assert!(state.contains(gtk4::StateFlags::PRELIGHT));
+    fn clicking_active_tool_returns_to_selection_mode() {
+        assert_eq!(next_tool(Tool::Arrow, Tool::Arrow), Tool::None);
+        assert_eq!(next_tool(Tool::Blur, Tool::Blur), Tool::None);
     }
 
     #[test]
