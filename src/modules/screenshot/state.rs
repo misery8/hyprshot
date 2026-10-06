@@ -115,16 +115,17 @@ impl ScreenshotState {
 
     pub fn update_drag(&mut self, dx: i32, dy: i32) {
         let Some((start_x, start_y)) = self.drag_start else { return; };
+        let current = (start_x + dx, start_y + dy);
 
         if self.current_tool != Tool::None {
-            self.current_shape = self.get_current_shape();
+            let constrained = self.selection.rect.clamp_point(current);
+            self.current_shape = self.get_current_shape(constrained);
+            self.mouse_pos = current;
             return;
         }
 
         let Some(origin) = self.drag_origin else { return; };
         let Some(mode) = self.drag_mode else { return; };
-
-        let current = (start_x + dx, start_y + dy);
 
         self.selection.rect = match mode {
             DragMode::Create => Rect::from_points_bounded(
@@ -188,9 +189,8 @@ impl ScreenshotState {
         export_selection(original_surface, self)
     }
 
-    fn get_current_shape(&self) -> Option<Shape> {
+    fn get_current_shape(&self, to: (i32, i32)) -> Option<Shape> {
         let from = self.drag_start?;
-        let to = self.mouse_pos;
 
         match self.current_tool {
             Tool::Arrow => Some(Shape::Arrow {
@@ -345,6 +345,13 @@ impl Rect {
 
     pub fn as_f64(&self) -> (f64, f64, f64, f64) {
         (self.x as f64, self.y as f64, self.w as f64, self.h as f64)
+    }
+
+    fn clamp_point(&self, (x, y): (i32, i32)) -> (i32, i32) {
+        (
+            x.clamp(self.x, self.right()),
+            y.clamp(self.y, self.bottom()),
+        )
     }
 
     fn right(&self) -> i32 {
@@ -579,6 +586,60 @@ mod tests {
         state.update_drag(500, 500);
 
         assert_eq!(*state.selection().rect(), Rect { x: 20, y: 30, w: 180, h: 150 });
+    }
+
+    #[test]
+    fn arrow_drag_stops_at_selection_boundary() {
+        let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
+        let mut state = paused_state_with_rect(rect, (200, 200));
+        let _ = state.set_tool(Tool::Arrow);
+        state.begin_drag(40, 50);
+
+        state.update_drag(500, 500);
+
+        assert_eq!(
+            state.current_shape(),
+            Some(&Shape::Arrow {
+                from: (40, 50),
+                to: (140, 110),
+                color: (255, 0, 0),
+            })
+        );
+    }
+
+    #[test]
+    fn rectangle_drag_stops_at_selection_boundary() {
+        let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
+        let mut state = paused_state_with_rect(rect, (200, 200));
+        let _ = state.set_tool(Tool::Rectangle);
+        state.begin_drag(40, 50);
+
+        state.update_drag(500, 500);
+
+        assert_eq!(
+            state.current_shape(),
+            Some(&Shape::Rectangle {
+                rect: Rect { x: 40, y: 50, w: 100, h: 60 },
+                color: (255, 0, 0),
+            })
+        );
+    }
+
+    #[test]
+    fn blur_drag_stops_at_selection_boundary() {
+        let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
+        let mut state = paused_state_with_rect(rect, (200, 200));
+        let _ = state.set_tool(Tool::Blur);
+        state.begin_drag(100, 90);
+
+        state.update_drag(-500, -500);
+
+        assert_eq!(
+            state.current_shape(),
+            Some(&Shape::Blur {
+                rect: Rect { x: 20, y: 30, w: 80, h: 60 },
+            })
+        );
     }
 
     #[test]
