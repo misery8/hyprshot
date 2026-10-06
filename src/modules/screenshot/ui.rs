@@ -99,9 +99,21 @@ impl ScreenshotWidgets {
             if let Some(shape) = state.current_shape() {
                 render::draw_shape(&surface, cr, shape);
             }
+
+            if let Some(input) = state.text_input() {
+                cr.save().expect("Failed to save text preview context");
+                let (x, y, w, h) = state.selection().rect().as_f64();
+                cr.rectangle(x, y, w, h);
+                cr.clip();
+                render::draw_text_preview(
+                    cr,
+                    input.position(),
+                    input.text(),
+                    input.color(),
+                );
+                cr.restore().expect("Failed to restore text preview context");
+            }
         });
     }
 
 }
-
- 
