@@ -95,7 +95,7 @@ impl Canvas {
         cr.restore().expect("Failed to restore undo context");
     }
 
-    pub fn apply_shape(&self, shape: &Shape) {
+    pub fn apply_shape(&self, shape: &Shape, clip: &Rect) {
         if !shape.is_valid() {
             return;
         }
@@ -114,7 +114,7 @@ impl Canvas {
 
         let cr = Context::new(&*surface)
             .expect("Failed to create bake context");
-        render::draw_shape(&*surface, &cr, shape);
+        render::draw_shape_clipped(&*surface, &cr, shape, clip);
     }
 
     fn clone_region(surface: &ImageSurface, rect: Rect) -> Result<ImageSurface, Error> {
@@ -230,7 +230,7 @@ mod tests {
     fn applying_valid_shape_creates_undo_entry() {
         let canvas = test_canvas(100, 100);
 
-        canvas.apply_shape(&valid_rectangle());
+        canvas.apply_shape(&valid_rectangle(), &Rect { x: 0, y: 0, w: 100, h: 100 });
 
         assert_eq!(canvas.history.borrow().len(), 1);
     }
@@ -240,7 +240,7 @@ mod tests {
         let canvas = test_canvas(100, 100);
         let before = surface_png(&canvas);
 
-        canvas.apply_shape(&valid_rectangle());
+        canvas.apply_shape(&valid_rectangle(), &Rect { x: 0, y: 0, w: 100, h: 100 });
         let after = surface_png(&canvas);
         assert_ne!(after, before);
 
@@ -253,7 +253,7 @@ mod tests {
     fn undo_snapshot_is_smaller_than_canvas_for_local_shape() {
         let canvas = test_canvas(100, 100);
 
-        canvas.apply_shape(&valid_rectangle());
+        canvas.apply_shape(&valid_rectangle(), &Rect { x: 0, y: 0, w: 100, h: 100 });
 
         let history = canvas.history.borrow();
         let snapshot = &history[0];
@@ -262,10 +262,66 @@ mod tests {
     }
 
     #[test]
+    fn applying_shape_does_not_modify_pixels_outside_selection() {
+        let canvas = test_canvas(100, 100);
+        let before = surface_png(&canvas);
+        let selection = Rect { x: 20, y: 20, w: 40, h: 40 };
+        let shape = Shape::Rectangle {
+            rect: Rect { x: 30, y: 30, w: 50, h: 50 },
+            color: (0, 0, 0),
+        };
+
+        canvas.apply_shape(&shape, &selection);
+
+        let surface = canvas.surface.borrow();
+        let outside = ImageSurface::create(cairo::Format::ARgb32, 100, 100).unwrap();
+        {
+            let cr = Context::new(&outside).unwrap();
+            cr.set_source_surface(&*surface, 0.0, 0.0).unwrap();
+            cr.paint().unwrap();
+        }
+        drop(surface);
+
+        let after = {
+            let mut bytes = Vec::new();
+            outside.write_to_png(&mut bytes).unwrap();
+            bytes
+        };
+
+        // The whole image changes because the in-selection part is drawn, but
+        // pixels outside the selection must remain identical. Verify by restoring
+        // only the selected region from the original and comparing full images.
+        {
+            let current = canvas.surface.borrow_mut();
+            let original = ImageSurface::create(cairo::Format::ARgb32, 100, 100).unwrap();
+            let cr = Context::new(&original).unwrap();
+            cr.set_source_rgb(1.0, 1.0, 1.0);
+            cr.paint().unwrap();
+
+            let cr = Context::new(&*current).unwrap();
+            cr.save().unwrap();
+            cr.rectangle(
+                selection.x as f64,
+                selection.y as f64,
+                selection.w as f64,
+                selection.h as f64,
+            );
+            cr.clip();
+            cr.set_operator(cairo::Operator::Source);
+            cr.set_source_surface(&original, 0.0, 0.0).unwrap();
+            cr.paint().unwrap();
+            cr.restore().unwrap();
+        }
+
+        assert_eq!(surface_png(&canvas), before);
+        assert_ne!(after, before);
+    }
+
+    #[test]
     fn text_shape_uses_regional_undo_snapshot() {
         let canvas = test_canvas(200, 100);
 
-        canvas.apply_shape(&valid_text());
+        canvas.apply_shape(&valid_text(), &Rect { x: 0, y: 0, w: 200, h: 100 });
 
         let history = canvas.history.borrow();
         assert_eq!(history.len(), 1);

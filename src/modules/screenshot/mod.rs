@@ -69,7 +69,7 @@ fn handle_action(
             match sub_action {
                 ScreenshotAction::SetTool(tool) => {
                     if let Some(shape) = s.set_tool(tool) {
-                        canvas.apply_shape(&shape);
+                        canvas.apply_shape(&shape, s.selection().rect());
                     }
                 }
                 ScreenshotAction::SetColor(red, green, blue) => s.set_color((red, green, blue)),
@@ -95,7 +95,7 @@ fn handle_action(
                 }
                 ScreenshotAction::DragBegin(x, y) => {
                     if let Some(shape) = s.commit_text() {
-                        canvas.apply_shape(&shape);
+                        canvas.apply_shape(&shape, s.selection().rect());
                     }
                     s.begin_drag(x, y);
                 },
@@ -105,7 +105,7 @@ fn handle_action(
                 }
                 ScreenshotAction::DragEnd => {
                     if let Some(shape) = s.current_shape() {
-                        canvas.apply_shape(shape);
+                        canvas.apply_shape(shape, s.selection().rect());
                     }
                     s.end_drag();
 
@@ -121,12 +121,12 @@ fn handle_action(
                 ScreenshotAction::TextBackspace => s.backspace_text(),
                 ScreenshotAction::TextCommit => {
                     if let Some(shape) = s.commit_text() {
-                        canvas.apply_shape(&shape);
+                        canvas.apply_shape(&shape, s.selection().rect());
                     }
                 }
                 ScreenshotAction::Save => {
                     if let Some(shape) = s.commit_text() {
-                        canvas.apply_shape(&shape);
+                        canvas.apply_shape(&shape, s.selection().rect());
                     }
 
                     let buf = s.export_selection(&canvas.surface.borrow())

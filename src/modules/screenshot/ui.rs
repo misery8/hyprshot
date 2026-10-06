@@ -143,7 +143,12 @@ impl ScreenshotWidgets {
             }
 
             if let Some(shape) = state.current_shape() {
-                render::draw_shape(&surface, cr, shape);
+                render::draw_shape_clipped(
+                    &surface,
+                    cr,
+                    shape,
+                    state.selection().rect(),
+                );
             }
 
             if let Some(input) = state.text_input() {

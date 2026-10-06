@@ -91,6 +91,21 @@ pub fn draw_shape(surface: &ImageSurface, cr: &Context, shape: &Shape) {
     }
 }
 
+pub fn draw_shape_clipped(
+    surface: &ImageSurface,
+    cr: &Context,
+    shape: &Shape,
+    clip: &Rect,
+) {
+    let (x, y, w, h) = clip.as_f64();
+
+    cr.save().expect("Failed to save annotation clip context");
+    cr.rectangle(x, y, w, h);
+    cr.clip();
+    draw_shape(surface, cr, shape);
+    cr.restore().expect("Failed to restore annotation clip context");
+}
+
 pub fn draw_arrow(
     cr: &Context,
     from: (i32, i32),
