@@ -116,16 +116,27 @@ pub fn draw_text_preview(
     cr: &Context,
     position: (i32, i32),
     text: &str,
-    color: (u8, u8, u8),
+    text_color: (u8, u8, u8),
+    caret_color: (f64, f64, f64, f64),
+    caret_visible: bool,
 ) {
-    draw_text(cr, position, text, color);
+    draw_text(cr, position, text, text_color);
+
+    if !caret_visible {
+        return;
+    }
 
     configure_text_font(cr);
     let advance = cr.text_extents(text)
         .map(|extents| extents.x_advance())
         .unwrap_or(0.0);
 
-    set_color(cr, color, 1.0);
+    cr.set_source_rgba(
+        caret_color.0,
+        caret_color.1,
+        caret_color.2,
+        caret_color.3,
+    );
     cr.set_line_width(1.5);
     let caret_x = position.0 as f64 + advance + 1.0;
     cr.move_to(caret_x, position.1 as f64 - TEXT_FONT_SIZE);

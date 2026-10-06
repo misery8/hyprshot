@@ -1,4 +1,9 @@
-use std::{cell::RefCell, rc::Rc, sync::mpsc::Sender};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    sync::mpsc::Sender,
+    time::{Duration, Instant},
+};
 
 use gtk4::{Application, ApplicationWindow, DrawingArea, Overlay};
 use gtk4::prelude::*;
@@ -10,6 +15,7 @@ use crate::modules::screenshot::render;
 use crate::modules::screenshot::state::ScreenshotState;
 use crate::modules::screenshot::toolbar::Toolbar;
 
+const CARET_BLINK_INTERVAL: Duration = Duration::from_millis(500);
 
 pub struct ScreenshotWidgets {
     pub window: ApplicationWindow,
@@ -80,6 +86,44 @@ impl ScreenshotWidgets {
         state: Rc<RefCell<ScreenshotState>>,
         canvas: Rc<Canvas>,
     ) {
+        let caret_visible = Rc::new(Cell::new(true));
+        let last_text_len = Rc::new(Cell::new(None::<usize>));
+        let last_caret_toggle = Rc::new(RefCell::new(Instant::now()));
+
+        let tick_state = state.clone();
+        let tick_caret_visible = caret_visible.clone();
+        let tick_last_text_len = last_text_len.clone();
+        let tick_last_caret_toggle = last_caret_toggle.clone();
+
+        da.add_tick_callback(move |area, _| {
+            let text_len = tick_state
+                .borrow()
+                .text_input()
+                .map(|input| input.text().len());
+
+            match text_len {
+                Some(len) => {
+                    if tick_last_text_len.get() != Some(len) {
+                        tick_last_text_len.set(Some(len));
+                        tick_caret_visible.set(true);
+                        *tick_last_caret_toggle.borrow_mut() = Instant::now();
+                        area.queue_draw();
+                    } else if tick_last_caret_toggle.borrow().elapsed() >= CARET_BLINK_INTERVAL {
+                        tick_caret_visible.set(!tick_caret_visible.get());
+                        *tick_last_caret_toggle.borrow_mut() = Instant::now();
+                        area.queue_draw();
+                    }
+                }
+                None => {
+                    tick_last_text_len.set(None);
+                    tick_caret_visible.set(true);
+                    *tick_last_caret_toggle.borrow_mut() = Instant::now();
+                }
+            }
+
+            glib::ControlFlow::Continue
+        });
+
         da.set_draw_func(move |area, cr, _, _| {
             let state = state.borrow();
             let surface = canvas.surface.borrow();
@@ -105,11 +149,20 @@ impl ScreenshotWidgets {
                 let (x, y, w, h) = state.selection().rect().as_f64();
                 cr.rectangle(x, y, w, h);
                 cr.clip();
+
+                let caret_color = area.style_context().color();
                 render::draw_text_preview(
                     cr,
                     input.position(),
                     input.text(),
                     input.color(),
+                    (
+                        caret_color.red() as f64,
+                        caret_color.green() as f64,
+                        caret_color.blue() as f64,
+                        caret_color.alpha() as f64,
+                    ),
+                    caret_visible.get(),
                 );
                 cr.restore().expect("Failed to restore text preview context");
             }

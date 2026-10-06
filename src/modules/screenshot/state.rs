@@ -54,15 +54,22 @@ impl ScreenshotState {
         }
     }
 
-    pub fn set_tool(&mut self, tool: Tool) {
-        if self.current_tool == Tool::Text && tool != Tool::Text {
-            self.text_input = None;
-        }
+    pub fn set_tool(&mut self, tool: Tool) -> Option<Shape> {
+        let pending_text = if self.current_tool == Tool::Text && tool != Tool::Text {
+            self.commit_text()
+        } else {
+            None
+        };
+
         self.current_tool = tool;
+        pending_text
     }
 
     pub fn set_color(&mut self, color: (u8, u8, u8)) {
         self.current_color = color;
+        if let Some(input) = self.text_input.as_mut() {
+            input.color = color;
+        }
     }
 
     pub fn begin_drag(&mut self, x: i32, y: i32) {
@@ -534,7 +541,7 @@ mod tests {
     fn text_tool_click_starts_text_input_inside_selection() {
         let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
         let mut state = paused_state_with_rect(rect, (200, 200));
-        state.set_tool(Tool::Text);
+        let _ = state.set_tool(Tool::Text);
 
         state.begin_drag(40, 50);
 
@@ -547,7 +554,7 @@ mod tests {
     fn text_input_supports_edit_commit_and_cancel() {
         let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
         let mut state = paused_state_with_rect(rect, (200, 200));
-        state.set_tool(Tool::Text);
+        let _ = state.set_tool(Tool::Text);
         state.begin_drag(40, 50);
 
         state.append_text('Ж');
@@ -567,7 +574,7 @@ mod tests {
     fn changing_color_updates_active_text_input_and_commit() {
         let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
         let mut state = paused_state_with_rect(rect, (200, 200));
-        state.set_tool(Tool::Text);
+        let _ = state.set_tool(Tool::Text);
         state.begin_drag(40, 50);
         state.append_text('A');
 
@@ -584,7 +591,7 @@ mod tests {
     fn switching_away_from_text_returns_pending_text_shape() {
         let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
         let mut state = paused_state_with_rect(rect, (200, 200));
-        state.set_tool(Tool::Text);
+        let _ = state.set_tool(Tool::Text);
         state.begin_drag(40, 50);
         state.append_text('A');
 

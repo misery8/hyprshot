@@ -67,7 +67,11 @@ fn handle_action(
         }
         AppAction::Screenshot(sub_action) => {
             match sub_action {
-                ScreenshotAction::SetTool(tool) => s.set_tool(tool),
+                ScreenshotAction::SetTool(tool) => {
+                    if let Some(shape) = s.set_tool(tool) {
+                        canvas.apply_shape(&shape);
+                    }
+                }
                 ScreenshotAction::SetColor(red, green, blue) => s.set_color((red, green, blue)),
                 ScreenshotAction::ToggleMode => {
                     if s.selection().is_active() && !s.is_paused() {
@@ -90,6 +94,9 @@ fn handle_action(
                     }
                 }
                 ScreenshotAction::DragBegin(x, y) => {
+                    if let Some(shape) = s.commit_text() {
+                        canvas.apply_shape(&shape);
+                    }
                     s.begin_drag(x, y);
                 },
                 ScreenshotAction::DragUpdate(x, y) => {
