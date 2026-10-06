@@ -289,9 +289,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn active_tool_button_has_persistent_selected_state() {
-        assert!(tool_button_visual_state(true).contains(gtk4::StateFlags::SELECTED));
-        assert!(tool_button_visual_state(false).is_empty());
+    fn active_tool_button_suppresses_hover_state() {
+        let state = normalize_tool_button_state(
+            true,
+            gtk4::StateFlags::CHECKED | gtk4::StateFlags::PRELIGHT,
+        );
+
+        assert!(state.contains(gtk4::StateFlags::CHECKED));
+        assert!(!state.contains(gtk4::StateFlags::PRELIGHT));
+    }
+
+    #[test]
+    fn inactive_tool_button_keeps_hover_state() {
+        let state = normalize_tool_button_state(false, gtk4::StateFlags::PRELIGHT);
+
+        assert!(state.contains(gtk4::StateFlags::PRELIGHT));
     }
 
     #[test]
