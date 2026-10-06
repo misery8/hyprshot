@@ -562,4 +562,36 @@ mod tests {
         assert!(state.cancel_text());
         assert!(state.text_input().is_none());
     }
+
+    #[test]
+    fn changing_color_updates_active_text_input_and_commit() {
+        let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
+        let mut state = paused_state_with_rect(rect, (200, 200));
+        state.set_tool(Tool::Text);
+        state.begin_drag(40, 50);
+        state.append_text('A');
+
+        state.set_color((12, 34, 56));
+
+        assert_eq!(state.text_input().unwrap().color(), (12, 34, 56));
+        assert!(matches!(
+            state.commit_text(),
+            Some(Shape::Text { color: (12, 34, 56), .. })
+        ));
+    }
+
+    #[test]
+    fn switching_away_from_text_returns_pending_text_shape() {
+        let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
+        let mut state = paused_state_with_rect(rect, (200, 200));
+        state.set_tool(Tool::Text);
+        state.begin_drag(40, 50);
+        state.append_text('A');
+
+        let shape = state.set_tool(Tool::Arrow)
+            .expect("switching tools should preserve typed text");
+
+        assert!(matches!(shape, Shape::Text { ref text, .. } if text == "A"));
+        assert!(state.text_input().is_none());
+    }
 }
