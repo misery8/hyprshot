@@ -2,6 +2,9 @@ use cairo::{Context, ImageSurface};
 
 use crate::modules::screenshot::state::{Rect, Shape};
 
+const ARROW_LINE_WIDTH: f64 = 2.75;
+const RECTANGLE_LINE_WIDTH: f64 = 2.25;
+
 fn set_color(cr: &Context, color: (u8, u8, u8), alpha: f64) {
     cr.set_source_rgba(
         color.0 as f64 / 255.0,
@@ -44,34 +47,31 @@ pub fn draw_arrow(
     to: (i32, i32),
     color: (u8, u8, u8),
 ) {
-    
     let (x1, y1) = (from.0 as f64, from.1 as f64);
     let (x2, y2) = (to.0 as f64, to.1 as f64);
 
     set_color(cr, color, 1.0);
-    
-    cr.set_line_width(2.5);
+    cr.set_line_width(ARROW_LINE_WIDTH);
+
     cr.move_to(x1, y1);
     cr.line_to(x2, y2);
     cr.stroke().expect("Cairo stroke failed");
 
     let angle = (y2 - y1).atan2(x2 - x1);
-    let arrow_len = 14.0;
-    let arrow_ang = 0.5;
+    let arrow_len = 16.0;
+    let arrow_angle = std::f64::consts::PI / 6.0;
 
     cr.move_to(x2, y2);
     cr.line_to(
-        x2 - arrow_len * (angle - arrow_ang).cos(),
-        y2 - arrow_len * (angle - arrow_ang).sin()
+        x2 - arrow_len * (angle - arrow_angle).cos(),
+        y2 - arrow_len * (angle - arrow_angle).sin(),
     );
+    cr.move_to(x2, y2);
     cr.line_to(
-        x2 - arrow_len * (angle + arrow_ang).cos(),
-        y2 - arrow_len * (angle + arrow_ang).sin()
+        x2 - arrow_len * (angle + arrow_angle).cos(),
+        y2 - arrow_len * (angle + arrow_angle).sin(),
     );
-
-    cr.close_path();
-    cr.fill().expect("Cairo stroke failed");
-
+    cr.stroke().expect("Cairo stroke failed");
 }
 
 pub fn draw_rectangle(
@@ -83,14 +83,14 @@ pub fn draw_rectangle(
 
     set_color(cr, color, 1.0);
 
-    cr.set_line_width(2.0);
+    cr.set_line_width(RECTANGLE_LINE_WIDTH);
     cr.rectangle(x, y, w, h);
     cr.stroke().expect("Cairo stroke failed");
 }
 
 pub fn draw_blur(surface: &ImageSurface, cr: &Context, rect: &Rect) {
     let (x, y, w, h) = rect.as_f64();
-    
+
     let blurred_region = match crate::common::cairo_blur::blur_image_surface(
         surface, x, y, rect.w, rect.h, 10
     ) {
@@ -104,6 +104,6 @@ pub fn draw_blur(surface: &ImageSurface, cr: &Context, rect: &Rect) {
 
     cr.set_source_surface(&blurred_region, x, y).expect("Failed to set source");
     cr.paint().expect("Failed to paint");
-    
+
     cr.restore().expect("Failed to restore state");
 }
