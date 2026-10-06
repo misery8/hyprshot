@@ -2,11 +2,11 @@
   <defs>
     <mask id="palette-holes">
       <rect width="24" height="24" fill="white"/>
-      <circle cx="8" cy="8" r="1.3" fill="black"/>
-      <circle cx="12" cy="6.5" r="1.3" fill="black"/>
-      <circle cx="16" cy="8.5" r="1.3" fill="black"/>
-      <circle cx="7.5" cy="12.5" r="1.3" fill="black"/>
+      <circle cx="7.5" cy="7.5" r="1.4" fill="black"/>
+      <circle cx="12" cy="5.9" r="1.4" fill="black"/>
+      <circle cx="16.7" cy="7.9" r="1.4" fill="black"/>
+      <circle cx="6.8" cy="12.3" r="1.4" fill="black"/>
     </mask>
   </defs>
-  <path d="M12 3C6.48 3 2 6.58 2 11c0 4.36 3.94 8 8.8 8H13c1.1 0 2-.9 2-2 0-.55-.22-1.05-.59-1.41-.55-.55-.16-1.49.62-1.49H17c2.76 0 5-2.01 5-4.49C22 5.96 17.52 3 12 3Z" fill="#000000" mask="url(#palette-holes)"/>
+  <path d="M12 1.75C5.9 1.75 1.25 5.65 1.25 10.65 1.25 15.6 5.55 20 10.9 20h2.2a2.35 2.35 0 0 0 1.66-4.01c-.58-.58-.17-1.56.65-1.56h2.35c3.43 0 6.24-2.52 6.24-5.62C24 4.7 18.54 1.75 12 1.75Z" fill="#000000" mask="url(#palette-holes)"/>
 </svg>
