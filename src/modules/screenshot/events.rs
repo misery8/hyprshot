@@ -69,6 +69,7 @@ pub fn init_events(tx: Sender<AppAction>, widgets: &ScreenshotWidgets) {
     widgets.window.add_controller(controller);
 
     let key_controller = EventControllerKey::new();
+    key_controller.set_propagation_phase(gtk4::PropagationPhase::Capture);
     key_controller.connect_key_pressed(clone!(#[strong] tx, move |_, key, _, modifiers| {
         if key == Key::Control_L || key == Key::Control_R {
             let _ = tx.send(AppAction::Screenshot(ScreenshotAction::ToggleMode));
