@@ -3,14 +3,20 @@ use std::rc::Rc;
 use std::sync::mpsc::Sender;
 
 use glib::clone;
-use gtk4::{Box, Button, CssProvider, DrawingArea, Grid, Image, Overlay, Popover};
+use gtk4::{Box, Button, CssProvider, Grid, Image, MenuButton, Overlay, Popover};
 use gtk4::prelude::*;
 
 use crate::action::{AppAction, ScreenshotAction};
 use crate::modules::screenshot::state::{Rect, Tool};
 
 const TOOLBAR_GAP: i32 = 8;
+const BUTTON_SIZE: i32 = 36;
+const TOOL_ICON_SIZE: i32 = 24;
+const ACTION_ICON_SIZE: i32 = 20;
+const COLOR_INDICATOR_SIZE: i32 = 12;
+const COLOR_SWATCH_SIZE: i32 = 24;
 const ACTIVE_TOOL_CLASS: &str = "suggested-action";
+const COLOR_INDICATOR_CLASS: &str = "color-indicator";
 
 fn next_tool(current: Tool, clicked: Tool) -> Tool {
     if current == clicked {
@@ -18,6 +24,16 @@ fn next_tool(current: Tool, clicked: Tool) -> Tool {
     } else {
         clicked
     }
+}
+
+fn color_indicator_css((red, green, blue): (u8, u8, u8)) -> String {
+    format!(
+        ".{COLOR_INDICATOR_CLASS} {{ \
+            background-color: rgb({red}, {green}, {blue}); \
+            border-radius: 999px; \
+            border: 1px solid rgba(255, 255, 255, 0.85); \
+        }}"
+    )
 }
 
 macro_rules! create_exclusive_toolbuttons {
@@ -31,14 +47,14 @@ macro_rules! create_exclusive_toolbuttons {
         $(
             let icon = Image::from_resource($icon_path);
             icon.set_opacity(1.0);
-            icon.set_pixel_size(24);
+            icon.set_pixel_size(TOOL_ICON_SIZE);
 
             let button = Button::builder()
                 .child(&icon)
                 .focusable(false)
                 .can_focus(false)
-                .width_request(36)
-                .height_request(36)
+                .width_request(BUTTON_SIZE)
+                .height_request(BUTTON_SIZE)
                 .build();
 
             tool_buttons.push((button, $tool_variant));
@@ -106,15 +122,21 @@ impl Toolbar {
     }
 
     fn setup_drawing_tools(&self, tx: Sender<AppAction>) {
+        let tool_group = Box::new(gtk4::Orientation::Horizontal, 0);
+        tool_group.add_css_class("linked");
+        tool_group.set_focusable(false);
+
         create_exclusive_toolbuttons! {
             tx = tx,
-            container = self.container,
+            container = tool_group,
             tools = [
                 ("/io/github/misery8/hyprshot/icons/symbolic/diagonal-arrow-symbolic.svg", Tool::Arrow),
                 ("/io/github/misery8/hyprshot/icons/symbolic/rectangle-symbolic.svg", Tool::Rectangle),
                 ("/io/github/misery8/hyprshot/icons/symbolic/drop-water-symbolic.svg", Tool::Blur),
             ]
         };
+
+        self.container.append(&tool_group);
     }
 
     fn setup_undo_button(&self, tx: Sender<AppAction>) {
@@ -128,49 +150,49 @@ impl Toolbar {
     fn setup_color_picker_button(&self, tx: Sender<AppAction>) {
         let current_color = Rc::new(Cell::new((255u8, 0u8, 0u8)));
 
-        let color_indicator = DrawingArea::builder()
-            .width_request(12).height_request(12)
-            .halign(gtk4::Align::End).valign(gtk4::Align::End)
-            .margin_end(2).margin_bottom(2)
-            .build();
+        let indicator_provider = CssProvider::new();
+        indicator_provider.load_from_data(&color_indicator_css(current_color.get()));
 
-        color_indicator.set_draw_func(clone!(#[strong] current_color,
-            move |_, cr, w, h| {
-                let (r, g, b) = current_color.get();
-                cr.set_source_rgb(r as f64 / 255.0, g as f64 / 255.0, b as f64 / 255.0);
-                cr.rectangle(0.0, 0.0, w as f64, h as f64);
-                let _ = cr.fill();
-            }
-        ));
+        let color_indicator = Box::builder()
+            .width_request(COLOR_INDICATOR_SIZE)
+            .height_request(COLOR_INDICATOR_SIZE)
+            .halign(gtk4::Align::End)
+            .valign(gtk4::Align::End)
+            .margin_end(2)
+            .margin_bottom(2)
+            .can_target(false)
+            .build();
+        color_indicator.add_css_class(COLOR_INDICATOR_CLASS);
+        color_indicator.style_context()
+            .add_provider(&indicator_provider, gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION);
 
         let icon = Image::from_resource("/io/github/misery8/hyprshot/icons/symbolic/palette-symbolic.svg");
-        icon.set_size_request(24, 24);
+        icon.set_pixel_size(TOOL_ICON_SIZE);
 
         let overlay = Overlay::builder()
             .child(&icon)
             .build();
         overlay.add_overlay(&color_indicator);
 
-        let button = Button::builder()
-            .width_request(36).height_request(36)
-            .focusable(false)
-            .child(&overlay)
-            .build();
-
         let popover = Popover::builder()
             .autohide(true)
             .build();
-        popover.set_parent(&button);
 
         let grid = Self::build_color_picker_grid(
             tx,
             current_color,
-            &color_indicator,
-            &popover
+            indicator_provider,
+            &popover,
         );
         popover.set_child(Some(&grid));
 
-        button.connect_clicked(clone!(#[strong] popover, move |_| popover.popup()));
+        let button = MenuButton::builder()
+            .width_request(BUTTON_SIZE)
+            .height_request(BUTTON_SIZE)
+            .focusable(false)
+            .child(&overlay)
+            .build();
+        button.set_popover(Some(&popover));
 
         self.container.append(&button);
     }
@@ -178,12 +200,16 @@ impl Toolbar {
     fn build_color_picker_grid(
         tx: Sender<AppAction>,
         indicator_color: Rc<Cell<(u8, u8, u8)>>,
-        drawing_area: &DrawingArea,
+        indicator_provider: CssProvider,
         popover: &Popover,
     ) -> Grid {
         let grid = Grid::builder()
             .row_spacing(2)
             .column_spacing(2)
+            .margin_top(6)
+            .margin_bottom(6)
+            .margin_start(6)
+            .margin_end(6)
             .build();
 
         const COLOR_PALETTE: &[(u8, u8, u8)] = &[
@@ -197,11 +223,12 @@ impl Toolbar {
 
         for (index, &(red, green, blue)) in COLOR_PALETTE.iter().enumerate() {
             let color_button = Button::builder()
-                .width_request(20).height_request(20)
+                .width_request(COLOR_SWATCH_SIZE)
+                .height_request(COLOR_SWATCH_SIZE)
                 .build();
 
             let color_css = format!(
-                "button {{ background: rgb({red}, {green}, {blue}); border: 1px solid #ccc; }}"
+                "button {{ background: rgb({red}, {green}, {blue}); border: 1px solid #ccc; border-radius: 3px; }}"
             );
 
             let provider = CssProvider::new();
@@ -212,13 +239,13 @@ impl Toolbar {
             color_button.connect_clicked(clone!(
                 #[strong] tx,
                 #[strong] indicator_color,
-                #[strong] drawing_area,
+                #[strong] indicator_provider,
                 #[weak] popover,
                 move |_| {
                     let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetColor(red, green, blue)));
 
                     indicator_color.set((red, green, blue));
-                    drawing_area.queue_draw();
+                    indicator_provider.load_from_data(&color_indicator_css((red, green, blue)));
                     popover.popdown();
                 }
             ));
@@ -271,10 +298,11 @@ fn calculate_position(
 fn default_button(icon: &str) -> Button {
     let icon = Image::from_resource(icon);
     icon.set_opacity(0.6);
-    icon.set_pixel_size(20);
+    icon.set_pixel_size(ACTION_ICON_SIZE);
 
     Button::builder()
-        .width_request(36).height_request(36)
+        .width_request(BUTTON_SIZE)
+        .height_request(BUTTON_SIZE)
         .focusable(false)
         .child(&icon)
         .build()
@@ -294,6 +322,14 @@ mod tests {
     fn clicking_active_tool_returns_to_selection_mode() {
         assert_eq!(next_tool(Tool::Arrow, Tool::Arrow), Tool::None);
         assert_eq!(next_tool(Tool::Blur, Tool::Blur), Tool::None);
+    }
+
+    #[test]
+    fn color_indicator_css_tracks_selected_color() {
+        let css = color_indicator_css((12, 34, 56));
+
+        assert!(css.contains("rgb(12, 34, 56)"));
+        assert!(css.contains("color-indicator"));
     }
 
     #[test]
