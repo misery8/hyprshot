@@ -39,7 +39,6 @@ impl ScreenshotState {
     pub fn is_paused(&self) -> bool { self.paused }
     pub fn mouse_pos(&self) -> (i32, i32) { self.mouse_pos }
     pub fn current_shape(&self) -> Option<&Shape> { self.current_shape.as_ref() }
-    pub fn current_tool(&self) -> Tool { self.current_tool }
     pub fn screen_size(&self) -> (i32, i32) { self.screen_size }
 
     pub fn set_screen_size(&mut self, size: (i32, i32)) {
