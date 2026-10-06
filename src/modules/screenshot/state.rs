@@ -571,20 +571,23 @@ mod tests {
     }
 
     #[test]
-    fn changing_color_updates_active_text_input_and_commit() {
+    fn changing_color_only_affects_future_text() {
         let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
         let mut state = paused_state_with_rect(rect, (200, 200));
         let _ = state.set_tool(Tool::Text);
         state.begin_drag(40, 50);
         state.append_text('A');
 
+        assert_eq!(state.text_input().unwrap().color(), (255, 0, 0));
+
         state.set_color((12, 34, 56));
 
+        assert_eq!(state.text_input().unwrap().color(), (255, 0, 0));
+
+        state.append_text('B');
+
         assert_eq!(state.text_input().unwrap().color(), (12, 34, 56));
-        assert!(matches!(
-            state.commit_text(),
-            Some(Shape::Text { color: (12, 34, 56), .. })
-        ));
+        assert_eq!(state.text_input().unwrap().text(), "AB");
     }
 
     #[test]
