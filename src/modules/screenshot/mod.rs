@@ -1,6 +1,4 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::sync::mpsc;
+use std::{cell::RefCell, rc::Rc, sync::mpsc};
 
 use gtk4::prelude::*;
 
@@ -109,7 +107,23 @@ fn handle_action(
                         app.quit();
                     }
                 }
+                ScreenshotAction::TextInput(ch) => s.append_text(ch),
+                ScreenshotAction::TextBackspace => s.backspace_text(),
+                ScreenshotAction::TextCommit => {
+                    if let Some(shape) = s.commit_text() {
+                        canvas.apply_shape(&shape);
+                    }
+                }
+                ScreenshotAction::Escape => {
+                    if !s.cancel_text() {
+                        app.quit();
+                    }
+                }
                 ScreenshotAction::Save => {
+                    if let Some(shape) = s.commit_text() {
+                        canvas.apply_shape(&shape);
+                    }
+
                     let buf = s.export_selection(&canvas.surface.borrow())
                         .expect("Failed export");
                     let _ = clipboard::copy_to_clipboard(&buf);
