@@ -15,7 +15,7 @@
 - **Instant launcher** via `PrintScreen`
 - **Pure Memory Flow** - No temporary files, everything is piped directly to the clipboard.
 - **Smart Clipboard** - Integrated daemon provides both **PNG** and **BMP** targets for seamless pasting into Windows-native app (VMs, RDP).
-- **Rich Annotations** - Built-in arrows, rectangles, and blur tool to hide sensitive data.
+- **Rich Annotations** - Built-in arrows, rectangles, text, and blur tool to hide sensitive data.
 - **Two modes**:
     - **Quick capture**: select -> release -> done
     - **Editor mode**: `Ctrl` + select -> annotate -> `Ctrl+S` to copy
@@ -55,7 +55,7 @@ Make sure you have:
 - `gtk4`, `glib2`, `cairo` development headers
 
 ```sh
-git clone [https://github.com/misery8/hyprshot.git](https://github.com/misery8/hyprshot.git)
+git clone https://github.com/misery8/hyprshot.git
 cd hyprshot
 cargo build --release
 sudo install -Dm755 target/release/hyprshot /usr/bin/hyprshot
