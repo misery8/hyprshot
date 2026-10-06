@@ -2,7 +2,6 @@ use crate::modules::screenshot::state::Tool;
 
 pub enum AppAction {
     Screenshot(ScreenshotAction),
-    Global(GlobalAction)
 }
 
 pub enum ScreenshotAction {
@@ -21,8 +20,4 @@ pub enum ScreenshotAction {
 
     Save,
     Undo,
-}
-
-pub enum GlobalAction {
-    Quit
 }
