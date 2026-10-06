@@ -1,7 +1,8 @@
-use cairo::ImageSurface;
+use cairo::{Context, Format, ImageSurface};
 
 use crate::capture::screenshot::export::export_selection;
 use crate::common::cursor;
+use crate::modules::screenshot::render;
 
 #[derive(Debug, Clone)]
 pub struct ScreenshotState {
@@ -158,9 +159,52 @@ impl ScreenshotState {
     }
 
     pub fn append_text(&mut self, ch: char) {
-        if let Some(input) = self.text_input.as_mut() {
-            input.append(ch, self.current_color);
+        let selection = self.selection.rect;
+        let color = self.current_color;
+        let Some(input) = self.text_input.as_mut() else { return; };
+
+        let mut candidate = input.clone();
+        candidate.append(ch, color);
+
+        if Self::text_input_fits_selection(&candidate, &selection) {
+            *input = candidate;
         }
+    }
+
+    fn text_input_fits_selection(input: &TextInput, selection: &Rect) -> bool {
+        let Ok(surface) = ImageSurface::create(Format::ARgb32, 1, 1) else {
+            return false;
+        };
+        let Ok(cr) = Context::new(&surface) else {
+            return false;
+        };
+
+        // Reuse the renderer's font setup so input validation matches the
+        // actual preview/commit typography.
+        if render::text_bounds(&cr, input.position, &input.runs).is_none() {
+            return false;
+        }
+
+        let mut cursor_x = input.position.0 as f64;
+        let mut right = cursor_x;
+
+        for run in &input.runs {
+            let Ok(extents) = cr.text_extents(run.text()) else {
+                return false;
+            };
+
+            right = right.max(
+                cursor_x + extents.x_bearing() + extents.width()
+            );
+            cursor_x += extents.x_advance();
+        }
+
+        // Ink extents ignore trailing spaces; the caret position does not.
+        // Guard the caret too so invisible whitespace cannot accumulate
+        // beyond the selection's right edge.
+        right = right.max(cursor_x + 1.0);
+
+        right <= selection.right() as f64
     }
 
     pub fn backspace_text(&mut self) {
@@ -677,6 +721,43 @@ mod tests {
         state.begin_drag(60, 70);
         assert!(state.cancel_text());
         assert!(state.text_input().is_none());
+    }
+
+    #[test]
+    fn text_input_stops_before_crossing_selection_right_edge() {
+        let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
+        let mut state = paused_state_with_rect(rect, (200, 200));
+        let _ = state.set_tool(Tool::Text);
+        state.begin_drag(40, 50);
+
+        for _ in 0..100 {
+            state.append_text('W');
+        }
+
+        let stopped = state.text_input().unwrap().text().to_string();
+        assert!(!stopped.is_empty());
+        assert!(stopped.len() < 100);
+
+        state.append_text('W');
+        assert_eq!(state.text_input().unwrap().text(), stopped);
+    }
+
+    #[test]
+    fn trailing_spaces_cannot_continue_past_selection_right_edge() {
+        let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
+        let mut state = paused_state_with_rect(rect, (200, 200));
+        let _ = state.set_tool(Tool::Text);
+        state.begin_drag(100, 50);
+
+        for _ in 0..100 {
+            state.append_text(' ');
+        }
+
+        let stopped = state.text_input().unwrap().text().to_string();
+        assert!(stopped.len() < 100);
+
+        state.append_text(' ');
+        assert_eq!(state.text_input().unwrap().text(), stopped);
     }
 
     #[test]
