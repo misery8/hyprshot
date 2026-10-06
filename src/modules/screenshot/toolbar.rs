@@ -1,12 +1,12 @@
 use std::cell::Cell;
 use std::rc::Rc;
+use std::sync::mpsc::Sender;
 
 use glib::clone;
 use gtk4::{Box, Button, CssProvider, DrawingArea, Grid, Image, Overlay, Popover, ToggleButton};
 use gtk4::prelude::*;
 
 use crate::action::{AppAction, ScreenshotAction};
-use crate::modules::screenshot::ActionSender;
 use crate::modules::screenshot::state::{Rect, Tool};
 
 const TOOLBAR_GAP: i32 = 8;
@@ -54,9 +54,9 @@ macro_rules! create_exclusive_toolbuttons {
                             }
                         }
                     }
-                    tx.send(AppAction::Screenshot(ScreenshotAction::SetTool(current_variant)));
+                    let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetTool(current_variant)));
                 } else {
-                    tx.send(AppAction::Screenshot(ScreenshotAction::SetTool(Tool::None)));
+                    let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetTool(Tool::None)));
                 }
             });
 
@@ -71,7 +71,7 @@ pub struct Toolbar {
 }
 
 impl Toolbar {
-    pub fn new(tx: ActionSender) -> Self {
+    pub fn new(tx: Sender<AppAction>) -> Self {
         let container = Box::builder()
             .orientation(gtk4::Orientation::Horizontal)
             .spacing(6).focusable(false)
@@ -92,7 +92,7 @@ impl Toolbar {
         toolbar
     }
 
-    fn setup_drawing_tools(&self, tx: ActionSender) {
+    fn setup_drawing_tools(&self, tx: Sender<AppAction>) {
         create_exclusive_toolbuttons! {
             tx = tx,
             container = self.container,
@@ -104,15 +104,15 @@ impl Toolbar {
         };
     }
 
-    fn setup_undo_button(&self, tx: ActionSender) {
+    fn setup_undo_button(&self, tx: Sender<AppAction>) {
         let button = default_button("/io/github/misery8/hyprshot/icons/symbolic/undo-symbolic.svg");
         button.connect_clicked(clone!(#[strong] tx, move |_| {
-            tx.send(AppAction::Screenshot(ScreenshotAction::Undo));
+            let _ = tx.send(AppAction::Screenshot(ScreenshotAction::Undo));
         }));
         self.container.append(&button);
     }
 
-    fn setup_color_picker_button(&self, tx: ActionSender) {
+    fn setup_color_picker_button(&self, tx: Sender<AppAction>) {
         let current_color = Rc::new(Cell::new((255u8, 0u8, 0u8)));
 
         let color_indicator = DrawingArea::builder()
@@ -163,7 +163,7 @@ impl Toolbar {
     }
 
     fn build_color_picker_grid(
-        tx: ActionSender,
+        tx: Sender<AppAction>,
         indicator_color: Rc<Cell<(u8, u8, u8)>>,
         drawing_area: &DrawingArea,
         popover: &Popover,
@@ -202,7 +202,7 @@ impl Toolbar {
                 #[strong] drawing_area,
                 #[weak] popover,
                 move |_| {
-                    tx.send(AppAction::Screenshot(ScreenshotAction::SetColor(red, green, blue)));
+                    let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetColor(red, green, blue)));
 
                     indicator_color.set((red, green, blue));
                     drawing_area.queue_draw();
