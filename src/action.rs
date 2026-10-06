@@ -14,6 +14,11 @@ pub enum ScreenshotAction {
     DragUpdate(i32, i32),
     DragEnd,
 
+    TextInput(char),
+    TextBackspace,
+    TextCommit,
+    Escape,
+
     Save,
     Undo,
 }
