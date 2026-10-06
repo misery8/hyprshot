@@ -79,7 +79,7 @@ impl ScreenshotState {
             {
                 self.current_shape = None;
                 self.drag_start = None;
-                self.text_input = Some(TextInput::new((x, y), self.current_color));
+                self.text_input = Some(TextInput::new((x, y)));
             }
             return;
         }
@@ -219,16 +219,14 @@ pub struct TextInput {
     position: (i32, i32),
     text: String,
     runs: Vec<TextRun>,
-    last_color: (u8, u8, u8),
 }
 
 impl TextInput {
-    fn new(position: (i32, i32), color: (u8, u8, u8)) -> Self {
+    fn new(position: (i32, i32)) -> Self {
         Self {
             position,
             text: String::new(),
             runs: Vec::new(),
-            last_color: color,
         }
     }
 
@@ -238,13 +236,11 @@ impl TextInput {
         if let Some(run) = self.runs.last_mut() {
             if run.color == color {
                 run.text.push(ch);
-                self.last_color = color;
                 return;
             }
         }
 
         self.runs.push(TextRun::new(ch.to_string(), color));
-        self.last_color = color;
     }
 
     fn backspace(&mut self) {
@@ -262,16 +258,11 @@ impl TextInput {
         if remove_last_run {
             self.runs.pop();
         }
-
-        if let Some(run) = self.runs.last() {
-            self.last_color = run.color;
-        }
     }
 
     pub fn position(&self) -> (i32, i32) { self.position }
     pub fn text(&self) -> &str { &self.text }
     pub fn runs(&self) -> &[TextRun] { &self.runs }
-    pub fn color(&self) -> (u8, u8, u8) { self.last_color }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -635,16 +626,15 @@ mod tests {
         state.begin_drag(40, 50);
         state.append_text('A');
 
-        assert_eq!(state.text_input().unwrap().color(), (255, 0, 0));
+        assert_eq!(state.text_input().unwrap().runs()[0].color(), (255, 0, 0));
 
         state.set_color((12, 34, 56));
 
-        assert_eq!(state.text_input().unwrap().color(), (255, 0, 0));
+        assert_eq!(state.text_input().unwrap().runs()[0].color(), (255, 0, 0));
 
         state.append_text('B');
 
         let input = state.text_input().unwrap();
-        assert_eq!(input.color(), (12, 34, 56));
         assert_eq!(input.text(), "AB");
         assert_eq!(input.runs().len(), 2);
         assert_eq!(input.runs()[0].text(), "A");
@@ -662,6 +652,25 @@ mod tests {
                     && runs[1].text() == "B"
                     && runs[1].color() == (12, 34, 56)
         ));
+    }
+
+    #[test]
+    fn backspace_removes_text_across_color_run_boundary() {
+        let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
+        let mut state = paused_state_with_rect(rect, (200, 200));
+        let _ = state.set_tool(Tool::Text);
+        state.begin_drag(40, 50);
+        state.append_text('A');
+        state.set_color((12, 34, 56));
+        state.append_text('B');
+
+        state.backspace_text();
+
+        let input = state.text_input().unwrap();
+        assert_eq!(input.text(), "A");
+        assert_eq!(input.runs().len(), 1);
+        assert_eq!(input.runs()[0].text(), "A");
+        assert_eq!(input.runs()[0].color(), (255, 0, 0));
     }
 
     #[test]
