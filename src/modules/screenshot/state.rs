@@ -67,9 +67,6 @@ impl ScreenshotState {
 
     pub fn set_color(&mut self, color: (u8, u8, u8)) {
         self.current_color = color;
-        if let Some(input) = self.text_input.as_mut() {
-            input.color = color;
-        }
     }
 
     pub fn begin_drag(&mut self, x: i32, y: i32) {
@@ -82,11 +79,7 @@ impl ScreenshotState {
             {
                 self.current_shape = None;
                 self.drag_start = None;
-                self.text_input = Some(TextInput {
-                    position: (x, y),
-                    text: String::new(),
-                    color: self.current_color,
-                });
+                self.text_input = Some(TextInput::new((x, y), self.current_color));
             }
             return;
         }
@@ -165,13 +158,13 @@ impl ScreenshotState {
 
     pub fn append_text(&mut self, ch: char) {
         if let Some(input) = self.text_input.as_mut() {
-            input.text.push(ch);
+            input.append(ch, self.current_color);
         }
     }
 
     pub fn backspace_text(&mut self) {
         if let Some(input) = self.text_input.as_mut() {
-            input.text.pop();
+            input.backspace();
         }
     }
 
@@ -187,8 +180,7 @@ impl ScreenshotState {
 
         Some(Shape::Text {
             position: input.position,
-            text: input.text,
-            color: input.color,
+            runs: input.runs,
         })
     }
 
@@ -226,11 +218,73 @@ impl ScreenshotState {
 pub struct TextInput {
     position: (i32, i32),
     text: String,
-    color: (u8, u8, u8),
+    runs: Vec<TextRun>,
+    last_color: (u8, u8, u8),
 }
 
 impl TextInput {
+    fn new(position: (i32, i32), color: (u8, u8, u8)) -> Self {
+        Self {
+            position,
+            text: String::new(),
+            runs: Vec::new(),
+            last_color: color,
+        }
+    }
+
+    fn append(&mut self, ch: char, color: (u8, u8, u8)) {
+        self.text.push(ch);
+
+        if let Some(run) = self.runs.last_mut() {
+            if run.color == color {
+                run.text.push(ch);
+                self.last_color = color;
+                return;
+            }
+        }
+
+        self.runs.push(TextRun::new(ch.to_string(), color));
+        self.last_color = color;
+    }
+
+    fn backspace(&mut self) {
+        if self.text.pop().is_none() {
+            return;
+        }
+
+        let remove_last_run = if let Some(run) = self.runs.last_mut() {
+            run.text.pop();
+            run.text.is_empty()
+        } else {
+            false
+        };
+
+        if remove_last_run {
+            self.runs.pop();
+        }
+
+        if let Some(run) = self.runs.last() {
+            self.last_color = run.color;
+        }
+    }
+
     pub fn position(&self) -> (i32, i32) { self.position }
+    pub fn text(&self) -> &str { &self.text }
+    pub fn runs(&self) -> &[TextRun] { &self.runs }
+    pub fn color(&self) -> (u8, u8, u8) { self.last_color }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextRun {
+    text: String,
+    color: (u8, u8, u8),
+}
+
+impl TextRun {
+    pub fn new(text: String, color: (u8, u8, u8)) -> Self {
+        Self { text, color }
+    }
+
     pub fn text(&self) -> &str { &self.text }
     pub fn color(&self) -> (u8, u8, u8) { self.color }
 }
@@ -427,8 +481,7 @@ pub enum Shape {
     },
     Text {
         position: (i32, i32),
-        text: String,
-        color: (u8, u8, u8),
+        runs: Vec<TextRun>,
     },
     Blur {
         rect: Rect,
@@ -445,7 +498,7 @@ impl Shape {
             Shape::Rectangle { rect, .. } | Shape::Blur { rect } => {
                 rect.w > 5 && rect.h > 5
             }
-            Shape::Text { text, .. } => !text.trim().is_empty(),
+            Shape::Text { runs, .. } => runs.iter().any(|run| !run.text().trim().is_empty()),
         }
     }
 }
@@ -562,7 +615,11 @@ mod tests {
         state.backspace_text();
 
         let shape = state.commit_text().expect("non-empty text should commit");
-        assert!(matches!(shape, Shape::Text { ref text, .. } if text == "Ж"));
+        assert!(matches!(
+            shape,
+            Shape::Text { ref runs, .. }
+                if runs.len() == 1 && runs[0].text() == "Ж"
+        ));
         assert!(state.text_input().is_none());
 
         state.begin_drag(60, 70);
@@ -586,8 +643,25 @@ mod tests {
 
         state.append_text('B');
 
-        assert_eq!(state.text_input().unwrap().color(), (12, 34, 56));
-        assert_eq!(state.text_input().unwrap().text(), "AB");
+        let input = state.text_input().unwrap();
+        assert_eq!(input.color(), (12, 34, 56));
+        assert_eq!(input.text(), "AB");
+        assert_eq!(input.runs().len(), 2);
+        assert_eq!(input.runs()[0].text(), "A");
+        assert_eq!(input.runs()[0].color(), (255, 0, 0));
+        assert_eq!(input.runs()[1].text(), "B");
+        assert_eq!(input.runs()[1].color(), (12, 34, 56));
+
+        let shape = state.commit_text().expect("colored text should commit");
+        assert!(matches!(
+            shape,
+            Shape::Text { ref runs, .. }
+                if runs.len() == 2
+                    && runs[0].text() == "A"
+                    && runs[0].color() == (255, 0, 0)
+                    && runs[1].text() == "B"
+                    && runs[1].color() == (12, 34, 56)
+        ));
     }
 
     #[test]
@@ -601,7 +675,11 @@ mod tests {
         let shape = state.set_tool(Tool::Arrow)
             .expect("switching tools should preserve typed text");
 
-        assert!(matches!(shape, Shape::Text { ref text, .. } if text == "A"));
+        assert!(matches!(
+            shape,
+            Shape::Text { ref runs, .. }
+                if runs.len() == 1 && runs[0].text() == "A"
+        ));
         assert!(state.text_input().is_none());
     }
 }

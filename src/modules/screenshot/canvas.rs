@@ -147,9 +147,9 @@ impl Canvas {
                     h: bottom - top,
                 }
             }
-            Shape::Text { position, text, .. } => {
+            Shape::Text { position, runs } => {
                 let cr = Context::new(surface).ok()?;
-                render::text_bounds(&cr, *position, text)?
+                render::text_bounds(&cr, *position, runs)?
             }
         };
 
@@ -191,6 +191,7 @@ impl Canvas {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::modules::screenshot::state::TextRun;
 
     fn test_canvas(width: i32, height: i32) -> Canvas {
         let surface = ImageSurface::create(cairo::Format::ARgb32, width, height).unwrap();
@@ -221,8 +222,7 @@ mod tests {
     fn valid_text() -> Shape {
         Shape::Text {
             position: (20, 40),
-            text: "Hello".to_string(),
-            color: (0, 0, 0),
+            runs: vec![TextRun::new("Hello".to_string(), (0, 0, 0))],
         }
     }
 

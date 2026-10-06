@@ -150,18 +150,10 @@ impl ScreenshotWidgets {
                 cr.rectangle(x, y, w, h);
                 cr.clip();
 
-                let caret_color = area.style_context().color();
                 render::draw_text_preview(
                     cr,
                     input.position(),
-                    input.text(),
-                    input.color(),
-                    (
-                        caret_color.red() as f64,
-                        caret_color.green() as f64,
-                        caret_color.blue() as f64,
-                        caret_color.alpha() as f64,
-                    ),
+                    input.runs(),
                     caret_visible.get(),
                 );
                 cr.restore().expect("Failed to restore text preview context");

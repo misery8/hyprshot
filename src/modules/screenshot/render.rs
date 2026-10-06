@@ -1,11 +1,13 @@
 use cairo::{Context, ImageSurface};
 
-use crate::modules::screenshot::state::{Rect, Shape};
+use crate::modules::screenshot::state::{Rect, Shape, TextRun};
 
 const ARROW_LINE_WIDTH: f64 = 2.75;
 const RECTANGLE_LINE_WIDTH: f64 = 2.25;
 const TEXT_FONT_SIZE: f64 = 22.0;
 const TEXT_BOUNDS_PADDING: i32 = 4;
+const CARET_OUTLINE_WIDTH: f64 = 3.5;
+const CARET_INNER_WIDTH: f64 = 1.5;
 
 fn set_color(cr: &Context, color: (u8, u8, u8), alpha: f64) {
     cr.set_source_rgba(
@@ -44,7 +46,7 @@ pub fn draw_shape(surface: &ImageSurface, cr: &Context, shape: &Shape) {
     match shape {
         Shape::Arrow { from, to, color } => draw_arrow(cr, *from, *to, *color),
         Shape::Rectangle { rect, color } => draw_rectangle(cr, rect, *color),
-        Shape::Text { position, text, color } => draw_text(cr, *position, text, *color),
+        Shape::Text { position, runs } => draw_text(cr, *position, runs),
         Shape::Blur { rect } => draw_blur(surface, cr, rect),
     }
 }
@@ -99,58 +101,86 @@ pub fn draw_rectangle(
 pub fn draw_text(
     cr: &Context,
     position: (i32, i32),
-    text: &str,
-    color: (u8, u8, u8),
+    runs: &[TextRun],
 ) {
-    if text.is_empty() {
+    if runs.is_empty() {
         return;
     }
 
-    set_color(cr, color, 1.0);
     configure_text_font(cr);
-    cr.move_to(position.0 as f64, position.1 as f64);
-    cr.show_text(text).expect("Cairo text render failed");
+    let mut x = position.0 as f64;
+    let y = position.1 as f64;
+
+    for run in runs {
+        if run.text().is_empty() {
+            continue;
+        }
+
+        let advance = cr.text_extents(run.text())
+            .map(|extents| extents.x_advance())
+            .unwrap_or(0.0);
+
+        set_color(cr, run.color(), 1.0);
+        cr.move_to(x, y);
+        cr.show_text(run.text()).expect("Cairo text render failed");
+        x += advance;
+    }
+}
+
+fn text_advance(cr: &Context, runs: &[TextRun]) -> f64 {
+    configure_text_font(cr);
+    runs.iter()
+        .filter_map(|run| cr.text_extents(run.text()).ok())
+        .map(|extents| extents.x_advance())
+        .sum()
+}
+
+fn draw_caret(cr: &Context, caret_x: f64, baseline_y: f64) {
+    let top = baseline_y - TEXT_FONT_SIZE;
+    let bottom = baseline_y + 3.0;
+
+    cr.set_source_rgba(0.0, 0.0, 0.0, 0.85);
+    cr.set_line_width(CARET_OUTLINE_WIDTH);
+    cr.move_to(caret_x, top);
+    cr.line_to(caret_x, bottom);
+    cr.stroke().expect("Cairo caret outline render failed");
+
+    cr.set_source_rgba(1.0, 1.0, 1.0, 1.0);
+    cr.set_line_width(CARET_INNER_WIDTH);
+    cr.move_to(caret_x, top);
+    cr.line_to(caret_x, bottom);
+    cr.stroke().expect("Cairo caret render failed");
 }
 
 pub fn draw_text_preview(
     cr: &Context,
     position: (i32, i32),
-    text: &str,
-    text_color: (u8, u8, u8),
-    caret_color: (f64, f64, f64, f64),
+    runs: &[TextRun],
     caret_visible: bool,
 ) {
-    draw_text(cr, position, text, text_color);
+    draw_text(cr, position, runs);
 
     if !caret_visible {
         return;
     }
 
-    configure_text_font(cr);
-    let advance = cr.text_extents(text)
-        .map(|extents| extents.x_advance())
-        .unwrap_or(0.0);
-
-    cr.set_source_rgba(
-        caret_color.0,
-        caret_color.1,
-        caret_color.2,
-        caret_color.3,
-    );
-    cr.set_line_width(1.5);
+    let advance = text_advance(cr, runs);
     let caret_x = position.0 as f64 + advance + 1.0;
-    cr.move_to(caret_x, position.1 as f64 - TEXT_FONT_SIZE);
-    cr.line_to(caret_x, position.1 as f64 + 3.0);
-    cr.stroke().expect("Cairo caret render failed");
+    draw_caret(cr, caret_x, position.1 as f64);
 }
 
-pub fn text_bounds(cr: &Context, position: (i32, i32), text: &str) -> Option<Rect> {
+pub fn text_bounds(cr: &Context, position: (i32, i32), runs: &[TextRun]) -> Option<Rect> {
+    let mut text = String::new();
+    for run in runs {
+        text.push_str(run.text());
+    }
+
     if text.is_empty() {
         return None;
     }
 
     configure_text_font(cr);
-    let extents = cr.text_extents(text).ok()?;
+    let extents = cr.text_extents(&text).ok()?;
 
     let left = (position.0 as f64 + extents.x_bearing()).floor() as i32 - TEXT_BOUNDS_PADDING;
     let top = (position.1 as f64 + extents.y_bearing()).floor() as i32 - TEXT_BOUNDS_PADDING;
