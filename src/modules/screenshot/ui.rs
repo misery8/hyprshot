@@ -6,6 +6,7 @@ use std::{
 };
 
 use gtk4::prelude::*;
+use gtk4::{Application, ApplicationWindow, DrawingArea, Overlay};
 use gtk4_layer_shell::LayerShell;
 
 use crate::action::AppAction;
