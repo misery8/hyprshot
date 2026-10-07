@@ -655,40 +655,84 @@ impl Rect {
         let screen_w = screen_size.0.max(1);
         let screen_h = screen_size.1.max(1);
 
-        let mut left = self.x.clamp(0, screen_w - 1);
-        let mut top = self.y.clamp(0, screen_h - 1);
-        let mut right = self.right().clamp(left + 1, screen_w);
-        let mut bottom = self.bottom().clamp(top + 1, screen_h);
+        let base_left = self.x.clamp(0, screen_w - 1);
+        let base_top = self.y.clamp(0, screen_h - 1);
+        let base_right = self.right().clamp(base_left + 1, screen_w);
+        let base_bottom = self.bottom().clamp(base_top + 1, screen_h);
 
-        if matches!(
+        let (left, right) = if matches!(
             zone,
             SelectionHitZone::W | SelectionHitZone::NW | SelectionHitZone::SW
         ) {
-            left = (self.x + dx).clamp(0, right - 1);
-        }
-
-        if matches!(
+            Self::normalize_resize_axis(
+                base_right,
+                self.x.saturating_add(dx).clamp(0, screen_w),
+                screen_w,
+                true,
+            )
+        } else if matches!(
             zone,
             SelectionHitZone::E | SelectionHitZone::NE | SelectionHitZone::SE
         ) {
-            right = (self.right() + dx).clamp(left + 1, screen_w);
-        }
+            Self::normalize_resize_axis(
+                base_left,
+                self.right().saturating_add(dx).clamp(0, screen_w),
+                screen_w,
+                false,
+            )
+        } else {
+            (base_left, base_right)
+        };
 
-        if matches!(
+        let (top, bottom) = if matches!(
             zone,
             SelectionHitZone::N | SelectionHitZone::NW | SelectionHitZone::NE
         ) {
-            top = (self.y + dy).clamp(0, bottom - 1);
-        }
-
-        if matches!(
+            Self::normalize_resize_axis(
+                base_bottom,
+                self.y.saturating_add(dy).clamp(0, screen_h),
+                screen_h,
+                true,
+            )
+        } else if matches!(
             zone,
             SelectionHitZone::S | SelectionHitZone::SW | SelectionHitZone::SE
         ) {
-            bottom = (self.bottom() + dy).clamp(top + 1, screen_h);
-        }
+            Self::normalize_resize_axis(
+                base_top,
+                self.bottom().saturating_add(dy).clamp(0, screen_h),
+                screen_h,
+                false,
+            )
+        } else {
+            (base_top, base_bottom)
+        };
 
         Self::from_edges(left, top, right, bottom)
+    }
+
+    fn normalize_resize_axis(
+        fixed: i32,
+        moving: i32,
+        limit: i32,
+        moving_started_before_fixed: bool,
+    ) -> (i32, i32) {
+        if moving < fixed {
+            return (moving, fixed);
+        }
+        if moving > fixed {
+            return (fixed, moving);
+        }
+
+        if moving_started_before_fixed && fixed > 0 {
+            (fixed - 1, fixed)
+        } else if !moving_started_before_fixed && fixed < limit {
+            (fixed, fixed + 1)
+        } else if fixed > 0 {
+            (fixed - 1, fixed)
+        } else {
+            (fixed, (fixed + 1).min(limit))
+        }
     }
 }
 
@@ -872,21 +916,253 @@ mod tests {
         );
     }
 
-    #[test]
-    fn resize_w_cannot_cross_fixed_east_edge() {
-        let origin = Rect {
+    fn resized_origin() -> Rect {
+        Rect {
             x: 20,
             y: 30,
             w: 100,
             h: 80,
-        };
+        }
+    }
+
+    #[test]
+    fn resize_edges_cross_opposite_anchor_and_continue() {
+        let origin = resized_origin();
+
+        assert_eq!(
+            origin.resized(SelectionHitZone::W, 130, 0, (300, 300)),
+            Rect {
+                x: 120,
+                y: 30,
+                w: 30,
+                h: 80
+            }
+        );
+        assert_eq!(
+            origin.resized(SelectionHitZone::E, -110, 0, (300, 300)),
+            Rect {
+                x: 10,
+                y: 30,
+                w: 10,
+                h: 80
+            }
+        );
+        assert_eq!(
+            origin.resized(SelectionHitZone::N, 0, 100, (300, 300)),
+            Rect {
+                x: 20,
+                y: 110,
+                w: 100,
+                h: 20
+            }
+        );
+        assert_eq!(
+            origin.resized(SelectionHitZone::S, 0, -100, (300, 300)),
+            Rect {
+                x: 20,
+                y: 10,
+                w: 100,
+                h: 20
+            }
+        );
+
+        assert_eq!(
+            origin.resized(SelectionHitZone::W, 180, 0, (300, 300)),
+            Rect {
+                x: 120,
+                y: 30,
+                w: 80,
+                h: 80
+            }
+        );
+    }
+
+    #[test]
+    fn resize_corners_invert_both_axes() {
+        let origin = resized_origin();
+
+        let cases = [
+            (
+                SelectionHitZone::NW,
+                (130, 100),
+                Rect {
+                    x: 120,
+                    y: 110,
+                    w: 30,
+                    h: 20,
+                },
+            ),
+            (
+                SelectionHitZone::NE,
+                (-110, 100),
+                Rect {
+                    x: 10,
+                    y: 110,
+                    w: 10,
+                    h: 20,
+                },
+            ),
+            (
+                SelectionHitZone::SW,
+                (130, -100),
+                Rect {
+                    x: 120,
+                    y: 10,
+                    w: 30,
+                    h: 20,
+                },
+            ),
+            (
+                SelectionHitZone::SE,
+                (-110, -100),
+                Rect {
+                    x: 10,
+                    y: 10,
+                    w: 10,
+                    h: 20,
+                },
+            ),
+        ];
+
+        for (zone, (dx, dy), expected) in cases {
+            assert_eq!(origin.resized(zone, dx, dy, (300, 300)), expected);
+        }
+    }
+
+    #[test]
+    fn corner_resize_axes_invert_independently() {
+        let origin = resized_origin();
+
+        assert_eq!(
+            origin.resized(SelectionHitZone::NW, 130, 0, (300, 300)),
+            Rect {
+                x: 120,
+                y: 30,
+                w: 30,
+                h: 80
+            }
+        );
+        assert_eq!(
+            origin.resized(SelectionHitZone::NW, 0, 100, (300, 300)),
+            Rect {
+                x: 20,
+                y: 110,
+                w: 100,
+                h: 20
+            }
+        );
+        assert_eq!(
+            origin.resized(SelectionHitZone::SE, -110, 0, (300, 300)),
+            Rect {
+                x: 10,
+                y: 30,
+                w: 10,
+                h: 80
+            }
+        );
+        assert_eq!(
+            origin.resized(SelectionHitZone::SE, 0, -100, (300, 300)),
+            Rect {
+                x: 20,
+                y: 10,
+                w: 100,
+                h: 20
+            }
+        );
+    }
+
+    #[test]
+    fn resize_crossing_back_uses_original_anchor_without_drift() {
+        let origin = resized_origin();
         let mut state = state_with_rect(origin, (300, 300));
-        state.drag_start = Some((20, 50));
+        state.drag_start = Some((20, 70));
         state.drag_origin = Some(origin);
         state.drag_mode = Some(DragMode::Resize(SelectionHitZone::W));
 
-        state.update_drag(200, 0);
+        state.update_drag(130, 0);
+        assert_eq!(
+            *state.selection().rect(),
+            Rect {
+                x: 120,
+                y: 30,
+                w: 30,
+                h: 80
+            }
+        );
 
+        state.update_drag(-10, 0);
+        assert_eq!(
+            *state.selection().rect(),
+            Rect {
+                x: 10,
+                y: 30,
+                w: 110,
+                h: 80
+            }
+        );
+        assert_eq!(state.drag_mode, Some(DragMode::Resize(SelectionHitZone::W)));
+    }
+
+    #[test]
+    fn resize_exact_crossing_keeps_one_pixel_axis_and_can_finalize() {
+        let origin = resized_origin();
+        let cases = [
+            (
+                SelectionHitZone::W,
+                (100, 0),
+                Rect {
+                    x: 119,
+                    y: 30,
+                    w: 1,
+                    h: 80,
+                },
+            ),
+            (
+                SelectionHitZone::E,
+                (-100, 0),
+                Rect {
+                    x: 20,
+                    y: 30,
+                    w: 1,
+                    h: 80,
+                },
+            ),
+            (
+                SelectionHitZone::N,
+                (0, 80),
+                Rect {
+                    x: 20,
+                    y: 109,
+                    w: 100,
+                    h: 1,
+                },
+            ),
+            (
+                SelectionHitZone::S,
+                (0, -80),
+                Rect {
+                    x: 20,
+                    y: 30,
+                    w: 100,
+                    h: 1,
+                },
+            ),
+        ];
+
+        for (zone, (dx, dy), expected) in cases {
+            let resized = origin.resized(zone, dx, dy, (300, 300));
+            assert_eq!(resized, expected);
+            assert!(resized.w > 0 && resized.h > 0);
+        }
+
+        let mut state = state_with_rect(origin, (300, 300));
+        state.drag_start = Some((20, 70));
+        state.drag_origin = Some(origin);
+        state.drag_mode = Some(DragMode::Resize(SelectionHitZone::W));
+        state.update_drag(100, 0);
+        state.end_drag();
+
+        assert_eq!(state.selection.phase, SelectionPhase::Finalized);
         assert_eq!(
             *state.selection().rect(),
             Rect {
@@ -894,6 +1170,83 @@ mod tests {
                 y: 30,
                 w: 1,
                 h: 80
+            }
+        );
+    }
+
+    #[test]
+    fn resize_inversion_clamps_moving_edge_to_every_screen_boundary() {
+        let origin = resized_origin();
+
+        assert_eq!(
+            origin.resized(SelectionHitZone::W, 500, 0, (300, 300)),
+            Rect {
+                x: 120,
+                y: 30,
+                w: 180,
+                h: 80
+            }
+        );
+        assert_eq!(
+            origin.resized(SelectionHitZone::E, -500, 0, (300, 300)),
+            Rect {
+                x: 0,
+                y: 30,
+                w: 20,
+                h: 80
+            }
+        );
+        assert_eq!(
+            origin.resized(SelectionHitZone::N, 0, 500, (300, 300)),
+            Rect {
+                x: 20,
+                y: 110,
+                w: 100,
+                h: 190
+            }
+        );
+        assert_eq!(
+            origin.resized(SelectionHitZone::S, 0, -500, (300, 300)),
+            Rect {
+                x: 20,
+                y: 0,
+                w: 100,
+                h: 30
+            }
+        );
+    }
+
+    #[test]
+    fn exact_crossing_falls_back_to_in_bounds_one_pixel_at_screen_anchor() {
+        let right_anchored = Rect {
+            x: 200,
+            y: 20,
+            w: 100,
+            h: 50,
+        };
+        assert_eq!(
+            right_anchored.resized(SelectionHitZone::W, 100, 0, (300, 200)),
+            Rect {
+                x: 299,
+                y: 20,
+                w: 1,
+                h: 50
+            }
+        );
+
+        let left_anchored = Rect {
+            x: 0,
+            y: 20,
+            w: 100,
+            h: 50,
+        };
+        assert_eq!(
+            left_anchored.resized(SelectionHitZone::E, -100, 0, (300, 200)),
+            Rect {
+                x: 0,
+                y: 20,
+                w: 1,
+                h: 50
             }
         );
     }

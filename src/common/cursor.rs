@@ -42,10 +42,26 @@ pub fn get_cursor_zone(
     let top = rect.y;
     let bottom = rect.y + rect.h;
 
-    let near_l = (x - left).abs() <= margin;
-    let near_r = (x - right).abs() <= margin;
-    let near_t = (y - top).abs() <= margin;
-    let near_b = (y - bottom).abs() <= margin;
+    let mut near_l = (x - left).abs() <= margin;
+    let mut near_r = (x - right).abs() <= margin;
+    let mut near_t = (y - top).abs() <= margin;
+    let mut near_b = (y - bottom).abs() <= margin;
+
+    if near_l && near_r {
+        if (x - left).abs() <= (x - right).abs() {
+            near_r = false;
+        } else {
+            near_l = false;
+        }
+    }
+
+    if near_t && near_b {
+        if (y - top).abs() <= (y - bottom).abs() {
+            near_b = false;
+        } else {
+            near_t = false;
+        }
+    }
 
     let inside_x = x > left && x < right;
     let inside_y = y > top && y < bottom;
@@ -63,5 +79,143 @@ pub fn get_cursor_zone(
 
         _ if inside_x && inside_y => SelectionHitZone::Inside,
         _ => SelectionHitZone::Outside,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cursor_zone_tracks_effective_edge_after_axis_inversion() {
+        let cases = [
+            (
+                Rect {
+                    x: 120,
+                    y: 30,
+                    w: 30,
+                    h: 80,
+                },
+                (150, 70),
+                SelectionHitZone::E,
+            ),
+            (
+                Rect {
+                    x: 10,
+                    y: 30,
+                    w: 10,
+                    h: 80,
+                },
+                (10, 70),
+                SelectionHitZone::W,
+            ),
+            (
+                Rect {
+                    x: 20,
+                    y: 110,
+                    w: 100,
+                    h: 20,
+                },
+                (70, 130),
+                SelectionHitZone::S,
+            ),
+            (
+                Rect {
+                    x: 20,
+                    y: 10,
+                    w: 100,
+                    h: 20,
+                },
+                (70, 10),
+                SelectionHitZone::N,
+            ),
+        ];
+
+        for (rect, pointer, expected) in cases {
+            assert_eq!(get_cursor_zone(&rect, pointer, Some(10)), expected);
+        }
+    }
+
+    #[test]
+    fn cursor_zone_tracks_effective_corner_after_inversion() {
+        let cases = [
+            (
+                Rect {
+                    x: 120,
+                    y: 110,
+                    w: 30,
+                    h: 20,
+                },
+                (150, 130),
+                SelectionHitZone::SE,
+            ),
+            (
+                Rect {
+                    x: 10,
+                    y: 110,
+                    w: 10,
+                    h: 20,
+                },
+                (10, 130),
+                SelectionHitZone::SW,
+            ),
+            (
+                Rect {
+                    x: 120,
+                    y: 10,
+                    w: 30,
+                    h: 20,
+                },
+                (150, 10),
+                SelectionHitZone::NE,
+            ),
+            (
+                Rect {
+                    x: 10,
+                    y: 10,
+                    w: 10,
+                    h: 20,
+                },
+                (10, 10),
+                SelectionHitZone::NW,
+            ),
+        ];
+
+        for (rect, pointer, expected) in cases {
+            assert_eq!(get_cursor_zone(&rect, pointer, Some(10)), expected);
+        }
+    }
+
+    #[test]
+    fn narrow_crossing_rect_uses_nearest_opposite_edge() {
+        let horizontal = Rect {
+            x: 119,
+            y: 30,
+            w: 1,
+            h: 80,
+        };
+        assert_eq!(
+            get_cursor_zone(&horizontal, (120, 70), Some(10)),
+            SelectionHitZone::E
+        );
+        assert_eq!(
+            get_cursor_zone(&horizontal, (119, 70), Some(10)),
+            SelectionHitZone::W
+        );
+
+        let vertical = Rect {
+            x: 20,
+            y: 109,
+            w: 100,
+            h: 1,
+        };
+        assert_eq!(
+            get_cursor_zone(&vertical, (70, 110), Some(10)),
+            SelectionHitZone::S
+        );
+        assert_eq!(
+            get_cursor_zone(&vertical, (70, 109), Some(10)),
+            SelectionHitZone::N
+        );
     }
 }
