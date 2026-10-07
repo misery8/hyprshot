@@ -52,8 +52,7 @@ impl Canvas {
             .expect("Failed to create surface");
 
         {
-            let cr = Context::new(&surface)
-                .expect("Failed to create Cairo context");
+            let cr = Context::new(&surface).expect("Failed to create Cairo context");
             unsafe {
                 gdk_cairo_set_source_pixbuf(cr.to_raw_none(), pixbuf.to_glib_none().0, 0.0, 0.0);
             }
@@ -74,8 +73,7 @@ impl Canvas {
         };
 
         let surface = self.surface.borrow_mut();
-        let cr = Context::new(&*surface)
-            .expect("Failed to create undo context");
+        let cr = Context::new(&*surface).expect("Failed to create undo context");
 
         cr.save().expect("Failed to save undo context");
         cr.rectangle(
@@ -86,11 +84,8 @@ impl Canvas {
         );
         cr.clip();
         cr.set_operator(cairo::Operator::Source);
-        cr.set_source_surface(
-            &entry.surface,
-            entry.rect.x as f64,
-            entry.rect.y as f64,
-        ).expect("Failed to set undo surface");
+        cr.set_source_surface(&entry.surface, entry.rect.x as f64, entry.rect.y as f64)
+            .expect("Failed to set undo surface");
         cr.paint().expect("Failed to restore undo region");
         cr.restore().expect("Failed to restore undo context");
     }
@@ -112,8 +107,7 @@ impl Canvas {
             });
         }
 
-        let cr = Context::new(&*surface)
-            .expect("Failed to create bake context");
+        let cr = Context::new(&*surface).expect("Failed to create bake context");
         render::draw_shape(&*surface, &cr, shape);
     }
 
@@ -214,7 +208,12 @@ mod tests {
 
     fn valid_rectangle() -> Shape {
         Shape::Rectangle {
-            rect: Rect { x: 20, y: 20, w: 20, h: 20 },
+            rect: Rect {
+                x: 20,
+                y: 20,
+                w: 20,
+                h: 20,
+            },
             color: (0, 0, 0),
         }
     }

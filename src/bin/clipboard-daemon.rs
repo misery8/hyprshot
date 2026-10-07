@@ -1,7 +1,7 @@
 use std::os::fd::AsFd;
 use std::{
     collections::HashMap,
-    io::{Read, Cursor}
+    io::{Cursor, Read},
 };
 
 use anyhow::{Context, Result};
@@ -9,14 +9,8 @@ use nix::poll::{poll, PollFd, PollFlags, PollTimeout};
 use nix::unistd::write;
 
 use wayland_client::{
+    protocol::{wl_data_device, wl_data_device_manager, wl_data_source, wl_registry, wl_seat},
     Connection, Dispatch, QueueHandle,
-    protocol::{
-        wl_registry,
-        wl_seat,
-        wl_data_device_manager,
-        wl_data_device,
-        wl_data_source,
-    },
 };
 
 struct State {
@@ -46,7 +40,7 @@ impl Dispatch<wl_data_source::WlDataSource, ()> for State {
                             Err(nix::errno::Errno::EAGAIN) => {
                                 let mut pfd = [PollFd::new(fd, PollFlags::POLLOUT)];
                                 let _ = poll(&mut pfd, PollTimeout::NONE);
-                            },
+                            }
                             Err(_) => break,
                         }
                     }
@@ -90,7 +84,8 @@ impl LazyData {
 
 fn main() -> Result<()> {
     let mut png_data = Vec::new();
-    std::io::stdin().read_to_end(&mut png_data)
+    std::io::stdin()
+        .read_to_end(&mut png_data)
         .context("Failed to read stdin")?;
 
     let mut data_map = HashMap::new();
@@ -102,7 +97,7 @@ fn main() -> Result<()> {
             let mut bmp = Cursor::new(Vec::with_capacity(png_data.capacity()));
             img.write_to(&mut bmp, image::ImageFormat::Bmp).unwrap();
             bmp.into_inner()
-        }))
+        })),
     );
 
     let mut state = State {
@@ -116,10 +111,12 @@ fn main() -> Result<()> {
 
     event_queue.roundtrip(&mut state)?;
 
-    let manager = globals.bind::<wl_data_device_manager::WlDataDeviceManager, _, _>(&qh, 1..=1, ())
+    let manager = globals
+        .bind::<wl_data_device_manager::WlDataDeviceManager, _, _>(&qh, 1..=1, ())
         .context("Failed to bind DataControlManagerV1")?;
 
-    let seat = globals.bind::<wl_seat::WlSeat, _, _>(&qh, 1..=1, ())
+    let seat = globals
+        .bind::<wl_seat::WlSeat, _, _>(&qh, 1..=1, ())
         .context("Failed to bind WlSeat")?;
 
     let source = manager.create_data_source(&qh, ());

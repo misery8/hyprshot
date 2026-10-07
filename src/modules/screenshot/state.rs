@@ -37,12 +37,24 @@ impl Default for ScreenshotState {
 }
 
 impl ScreenshotState {
-    pub fn selection(&self) -> &Selection { &self.selection }
-    pub fn is_paused(&self) -> bool { self.paused }
-    pub fn mouse_pos(&self) -> (i32, i32) { self.mouse_pos }
-    pub fn current_shape(&self) -> Option<&Shape> { self.current_shape.as_ref() }
-    pub fn text_input(&self) -> Option<&TextInput> { self.text_input.as_ref() }
-    pub fn screen_size(&self) -> (i32, i32) { self.screen_size }
+    pub fn selection(&self) -> &Selection {
+        &self.selection
+    }
+    pub fn is_paused(&self) -> bool {
+        self.paused
+    }
+    pub fn mouse_pos(&self) -> (i32, i32) {
+        self.mouse_pos
+    }
+    pub fn current_shape(&self) -> Option<&Shape> {
+        self.current_shape.as_ref()
+    }
+    pub fn text_input(&self) -> Option<&TextInput> {
+        self.text_input.as_ref()
+    }
+    pub fn screen_size(&self) -> (i32, i32) {
+        self.screen_size
+    }
 
     pub fn set_screen_size(&mut self, size: (i32, i32)) {
         self.screen_size = size;
@@ -73,10 +85,7 @@ impl ScreenshotState {
         self.mouse_pos = (x, y);
 
         if self.current_tool == Tool::Text {
-            if self.paused
-                && self.selection.is_active()
-                && self.selection.rect.contains((x, y))
-            {
+            if self.paused && self.selection.is_active() && self.selection.rect.contains((x, y)) {
                 self.current_shape = None;
                 self.drag_start = None;
                 self.text_input = Some(TextInput::new((x, y)));
@@ -85,10 +94,7 @@ impl ScreenshotState {
         }
 
         if self.current_tool != Tool::None {
-            if self.paused
-                && self.selection.is_active()
-                && self.selection.rect.contains((x, y))
-            {
+            if self.paused && self.selection.is_active() && self.selection.rect.contains((x, y)) {
                 self.current_shape = None;
                 self.drag_start = Some((x, y));
             }
@@ -98,11 +104,7 @@ impl ScreenshotState {
         self.drag_start = Some((x, y));
         self.drag_origin = Some(self.selection.rect);
 
-        let zone = cursor::get_cursor_zone(
-            &self.selection.rect,
-            self.mouse_pos,
-            Some(10),
-        );
+        let zone = cursor::get_cursor_zone(&self.selection.rect, self.mouse_pos, Some(10));
 
         self.drag_mode = Some(match zone {
             SelectionHitZone::Outside => DragMode::Create,
@@ -114,24 +116,28 @@ impl ScreenshotState {
     }
 
     pub fn update_drag(&mut self, dx: i32, dy: i32) {
-        let Some((start_x, start_y)) = self.drag_start else { return; };
+        let Some((start_x, start_y)) = self.drag_start else {
+            return;
+        };
 
         if self.current_tool != Tool::None {
             self.current_shape = self.get_current_shape();
             return;
         }
 
-        let Some(origin) = self.drag_origin else { return; };
-        let Some(mode) = self.drag_mode else { return; };
+        let Some(origin) = self.drag_origin else {
+            return;
+        };
+        let Some(mode) = self.drag_mode else {
+            return;
+        };
 
         let current = (start_x + dx, start_y + dy);
 
         self.selection.rect = match mode {
-            DragMode::Create => Rect::from_points_bounded(
-                (start_x, start_y),
-                current,
-                self.screen_size,
-            ),
+            DragMode::Create => {
+                Rect::from_points_bounded((start_x, start_y), current, self.screen_size)
+            }
             DragMode::Move => origin.moved_by(dx, dy, self.screen_size),
             DragMode::Resize(zone) => origin.resized(zone, dx, dy, self.screen_size),
         };
@@ -260,9 +266,15 @@ impl TextInput {
         }
     }
 
-    pub fn position(&self) -> (i32, i32) { self.position }
-    pub fn text(&self) -> &str { &self.text }
-    pub fn runs(&self) -> &[TextRun] { &self.runs }
+    pub fn position(&self) -> (i32, i32) {
+        self.position
+    }
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+    pub fn runs(&self) -> &[TextRun] {
+        &self.runs
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -276,8 +288,12 @@ impl TextRun {
         Self { text, color }
     }
 
-    pub fn text(&self) -> &str { &self.text }
-    pub fn color(&self) -> (u8, u8, u8) { self.color }
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+    pub fn color(&self) -> (u8, u8, u8) {
+        self.color
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -287,7 +303,9 @@ pub struct Selection {
 }
 
 impl Selection {
-    pub fn rect(&self) -> &Rect { &self.rect }
+    pub fn rect(&self) -> &Rect {
+        &self.rect
+    }
 
     pub fn idle() -> Self {
         Self {
@@ -332,7 +350,12 @@ pub struct Rect {
 
 impl Rect {
     pub fn zero() -> Self {
-        Self { x: 0, y: 0, w: 0, h: 0 }
+        Self {
+            x: 0,
+            y: 0,
+            w: 0,
+            h: 0,
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -364,11 +387,7 @@ impl Rect {
         Self::from_edges(left, top, right, bottom)
     }
 
-    fn from_points_bounded(
-        from: (i32, i32),
-        to: (i32, i32),
-        screen_size: (i32, i32),
-    ) -> Self {
+    fn from_points_bounded(from: (i32, i32), to: (i32, i32), screen_size: (i32, i32)) -> Self {
         let (screen_w, screen_h) = screen_size;
         let max_x = screen_w.max(0);
         let max_y = screen_h.max(0);
@@ -400,13 +419,7 @@ impl Rect {
         }
     }
 
-    fn resized(
-        self,
-        zone: SelectionHitZone,
-        dx: i32,
-        dy: i32,
-        screen_size: (i32, i32),
-    ) -> Self {
+    fn resized(self, zone: SelectionHitZone, dx: i32, dy: i32, screen_size: (i32, i32)) -> Self {
         let screen_w = screen_size.0.max(1);
         let screen_h = screen_size.1.max(1);
 
@@ -415,19 +428,31 @@ impl Rect {
         let mut right = self.right().clamp(left + 1, screen_w);
         let mut bottom = self.bottom().clamp(top + 1, screen_h);
 
-        if matches!(zone, SelectionHitZone::W | SelectionHitZone::NW | SelectionHitZone::SW) {
+        if matches!(
+            zone,
+            SelectionHitZone::W | SelectionHitZone::NW | SelectionHitZone::SW
+        ) {
             left = (self.x + dx).clamp(0, right - 1);
         }
 
-        if matches!(zone, SelectionHitZone::E | SelectionHitZone::NE | SelectionHitZone::SE) {
+        if matches!(
+            zone,
+            SelectionHitZone::E | SelectionHitZone::NE | SelectionHitZone::SE
+        ) {
             right = (self.right() + dx).clamp(left + 1, screen_w);
         }
 
-        if matches!(zone, SelectionHitZone::N | SelectionHitZone::NW | SelectionHitZone::NE) {
+        if matches!(
+            zone,
+            SelectionHitZone::N | SelectionHitZone::NW | SelectionHitZone::NE
+        ) {
             top = (self.y + dy).clamp(0, bottom - 1);
         }
 
-        if matches!(zone, SelectionHitZone::S | SelectionHitZone::SW | SelectionHitZone::SE) {
+        if matches!(
+            zone,
+            SelectionHitZone::S | SelectionHitZone::SW | SelectionHitZone::SE
+        ) {
             bottom = (self.bottom() + dy).clamp(top + 1, screen_h);
         }
 
@@ -448,8 +473,14 @@ pub enum Tool {
 pub enum SelectionHitZone {
     Outside,
     Inside,
-    N, S, E, W,
-    NW, NE, SW, SE,
+    N,
+    S,
+    E,
+    W,
+    NW,
+    NE,
+    SW,
+    SE,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -486,9 +517,7 @@ impl Shape {
                 let dist = ((to.0 - from.0).pow(2) + (to.1 - from.1).pow(2)).abs();
                 dist > 10
             }
-            Shape::Rectangle { rect, .. } | Shape::Blur { rect } => {
-                rect.w > 5 && rect.h > 5
-            }
+            Shape::Rectangle { rect, .. } | Shape::Blur { rect } => rect.w > 5 && rect.h > 5,
             Shape::Text { runs, .. } => runs.iter().any(|run| !run.text().trim().is_empty()),
         }
     }
@@ -526,12 +555,25 @@ mod tests {
 
         state.update_drag(-100, -100);
 
-        assert_eq!(*state.selection().rect(), Rect { x: 0, y: 0, w: 50, h: 60 });
+        assert_eq!(
+            *state.selection().rect(),
+            Rect {
+                x: 0,
+                y: 0,
+                w: 50,
+                h: 60
+            }
+        );
     }
 
     #[test]
     fn move_clamps_without_changing_size() {
-        let origin = Rect { x: 20, y: 30, w: 80, h: 60 };
+        let origin = Rect {
+            x: 20,
+            y: 30,
+            w: 80,
+            h: 60,
+        };
         let mut state = state_with_rect(origin, (200, 200));
         state.drag_start = Some((40, 50));
         state.drag_origin = Some(origin);
@@ -539,12 +581,25 @@ mod tests {
 
         state.update_drag(500, 500);
 
-        assert_eq!(*state.selection().rect(), Rect { x: 120, y: 140, w: 80, h: 60 });
+        assert_eq!(
+            *state.selection().rect(),
+            Rect {
+                x: 120,
+                y: 140,
+                w: 80,
+                h: 60
+            }
+        );
     }
 
     #[test]
     fn resize_nw_clamps_to_screen_and_keeps_south_east_fixed() {
-        let origin = Rect { x: 20, y: 30, w: 100, h: 80 };
+        let origin = Rect {
+            x: 20,
+            y: 30,
+            w: 100,
+            h: 80,
+        };
         let mut state = state_with_rect(origin, (300, 300));
         state.drag_start = Some((20, 30));
         state.drag_origin = Some(origin);
@@ -552,12 +607,25 @@ mod tests {
 
         state.update_drag(-50, -60);
 
-        assert_eq!(*state.selection().rect(), Rect { x: 0, y: 0, w: 120, h: 110 });
+        assert_eq!(
+            *state.selection().rect(),
+            Rect {
+                x: 0,
+                y: 0,
+                w: 120,
+                h: 110
+            }
+        );
     }
 
     #[test]
     fn resize_w_cannot_cross_fixed_east_edge() {
-        let origin = Rect { x: 20, y: 30, w: 100, h: 80 };
+        let origin = Rect {
+            x: 20,
+            y: 30,
+            w: 100,
+            h: 80,
+        };
         let mut state = state_with_rect(origin, (300, 300));
         state.drag_start = Some((20, 50));
         state.drag_origin = Some(origin);
@@ -565,12 +633,25 @@ mod tests {
 
         state.update_drag(200, 0);
 
-        assert_eq!(*state.selection().rect(), Rect { x: 119, y: 30, w: 1, h: 80 });
+        assert_eq!(
+            *state.selection().rect(),
+            Rect {
+                x: 119,
+                y: 30,
+                w: 1,
+                h: 80
+            }
+        );
     }
 
     #[test]
     fn resize_se_clamps_to_screen_edges() {
-        let origin = Rect { x: 20, y: 30, w: 100, h: 80 };
+        let origin = Rect {
+            x: 20,
+            y: 30,
+            w: 100,
+            h: 80,
+        };
         let mut state = state_with_rect(origin, (200, 180));
         state.drag_start = Some((120, 110));
         state.drag_origin = Some(origin);
@@ -578,12 +659,25 @@ mod tests {
 
         state.update_drag(500, 500);
 
-        assert_eq!(*state.selection().rect(), Rect { x: 20, y: 30, w: 180, h: 150 });
+        assert_eq!(
+            *state.selection().rect(),
+            Rect {
+                x: 20,
+                y: 30,
+                w: 180,
+                h: 150
+            }
+        );
     }
 
     #[test]
     fn text_tool_click_starts_text_input_inside_selection() {
-        let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
+        let rect = Rect {
+            x: 20,
+            y: 30,
+            w: 120,
+            h: 80,
+        };
         let mut state = paused_state_with_rect(rect, (200, 200));
         let _ = state.set_tool(Tool::Text);
 
@@ -596,7 +690,12 @@ mod tests {
 
     #[test]
     fn text_input_supports_edit_commit_and_cancel() {
-        let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
+        let rect = Rect {
+            x: 20,
+            y: 30,
+            w: 120,
+            h: 80,
+        };
         let mut state = paused_state_with_rect(rect, (200, 200));
         let _ = state.set_tool(Tool::Text);
         state.begin_drag(40, 50);
@@ -620,7 +719,12 @@ mod tests {
 
     #[test]
     fn changing_color_only_affects_future_text() {
-        let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
+        let rect = Rect {
+            x: 20,
+            y: 30,
+            w: 120,
+            h: 80,
+        };
         let mut state = paused_state_with_rect(rect, (200, 200));
         let _ = state.set_tool(Tool::Text);
         state.begin_drag(40, 50);
@@ -656,7 +760,12 @@ mod tests {
 
     #[test]
     fn backspace_removes_text_across_color_run_boundary() {
-        let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
+        let rect = Rect {
+            x: 20,
+            y: 30,
+            w: 120,
+            h: 80,
+        };
         let mut state = paused_state_with_rect(rect, (200, 200));
         let _ = state.set_tool(Tool::Text);
         state.begin_drag(40, 50);
@@ -675,13 +784,19 @@ mod tests {
 
     #[test]
     fn switching_away_from_text_returns_pending_text_shape() {
-        let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
+        let rect = Rect {
+            x: 20,
+            y: 30,
+            w: 120,
+            h: 80,
+        };
         let mut state = paused_state_with_rect(rect, (200, 200));
         let _ = state.set_tool(Tool::Text);
         state.begin_drag(40, 50);
         state.append_text('A');
 
-        let shape = state.set_tool(Tool::Arrow)
+        let shape = state
+            .set_tool(Tool::Arrow)
             .expect("switching tools should preserve typed text");
 
         assert!(matches!(

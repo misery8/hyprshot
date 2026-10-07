@@ -3,8 +3,8 @@ use std::rc::Rc;
 use std::sync::mpsc::Sender;
 
 use glib::clone;
-use gtk4::{Box, Button, CssProvider, Grid, Image, MenuButton, Overlay, Popover};
 use gtk4::prelude::*;
+use gtk4::{Box, Button, CssProvider, Grid, Image, MenuButton, Overlay, Popover};
 
 use crate::action::{AppAction, ScreenshotAction};
 use crate::modules::screenshot::state::{Rect, Tool};
@@ -20,13 +20,17 @@ const COLOR_INDICATOR_CLASS: &str = "color-indicator";
 const TOOLBAR_CLASS: &str = "hyprshot-toolbar";
 
 const ARROW_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/diagonal-arrow-symbolic.svg";
-const ARROW_ACTIVE_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/diagonal-arrow-active-symbolic.svg";
+const ARROW_ACTIVE_ICON: &str =
+    "/io/github/misery8/hyprshot/icons/symbolic/diagonal-arrow-active-symbolic.svg";
 const RECTANGLE_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/rectangle-symbolic.svg";
-const RECTANGLE_ACTIVE_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/rectangle-active-symbolic.svg";
+const RECTANGLE_ACTIVE_ICON: &str =
+    "/io/github/misery8/hyprshot/icons/symbolic/rectangle-active-symbolic.svg";
 const TEXT_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/text-symbolic.svg";
-const TEXT_ACTIVE_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/text-active-symbolic.svg";
+const TEXT_ACTIVE_ICON: &str =
+    "/io/github/misery8/hyprshot/icons/symbolic/text-active-symbolic.svg";
 const BLUR_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/drop-water-symbolic.svg";
-const BLUR_ACTIVE_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/drop-water-active-symbolic.svg";
+const BLUR_ACTIVE_ICON: &str =
+    "/io/github/misery8/hyprshot/icons/symbolic/drop-water-active-symbolic.svg";
 const UNDO_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/undo-symbolic.svg";
 const PALETTE_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/palette-symbolic.svg";
 
@@ -60,8 +64,8 @@ fn icon_image(resource: &str) -> Image {
 }
 
 fn tool_button(tool: Tool) -> Button {
-    let (icon_resource, _) = tool_icon_resources(tool)
-        .expect("annotation tool must have icon resources");
+    let (icon_resource, _) =
+        tool_icon_resources(tool).expect("annotation tool must have icon resources");
     let icon = icon_image(icon_resource);
 
     Button::builder()
@@ -103,8 +107,10 @@ impl Toolbar {
     pub fn new(tx: Sender<AppAction>) -> Self {
         let container = Box::builder()
             .orientation(gtk4::Orientation::Horizontal)
-            .spacing(6).focusable(false)
-            .halign(gtk4::Align::Start).valign(gtk4::Align::Start)
+            .spacing(6)
+            .focusable(false)
+            .halign(gtk4::Align::Start)
+            .valign(gtk4::Align::Start)
             .css_name("toolbar")
             .can_target(false)
             .opacity(0.0)
@@ -115,7 +121,8 @@ impl Toolbar {
         let toolbar_provider = CssProvider::new();
         toolbar_provider.load_from_data(toolbar_geometry_css());
         container.add_css_class(TOOLBAR_CLASS);
-        container.style_context()
+        container
+            .style_context()
             .add_provider(&toolbar_provider, gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION);
 
         let toolbar = Self { container };
@@ -176,9 +183,13 @@ impl Toolbar {
 
     fn setup_undo_button(&self, tx: Sender<AppAction>) {
         let button = default_button(UNDO_ICON);
-        button.connect_clicked(clone!(#[strong] tx, move |_| {
-            let _ = tx.send(AppAction::Screenshot(ScreenshotAction::Undo));
-        }));
+        button.connect_clicked(clone!(
+            #[strong]
+            tx,
+            move |_| {
+                let _ = tx.send(AppAction::Screenshot(ScreenshotAction::Undo));
+            }
+        ));
         self.container.append(&button);
     }
 
@@ -198,26 +209,19 @@ impl Toolbar {
             .can_target(false)
             .build();
         color_indicator.add_css_class(COLOR_INDICATOR_CLASS);
-        color_indicator.style_context()
-            .add_provider(&indicator_provider, gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION);
+        color_indicator.style_context().add_provider(
+            &indicator_provider,
+            gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
 
         let icon = icon_image_sized(PALETTE_ICON, PALETTE_ICON_SIZE);
 
-        let overlay = Overlay::builder()
-            .child(&icon)
-            .build();
+        let overlay = Overlay::builder().child(&icon).build();
         overlay.add_overlay(&color_indicator);
 
-        let popover = Popover::builder()
-            .autohide(true)
-            .build();
+        let popover = Popover::builder().autohide(true).build();
 
-        let grid = Self::build_color_picker_grid(
-            tx,
-            current_color,
-            indicator_provider,
-            &popover,
-        );
+        let grid = Self::build_color_picker_grid(tx, current_color, indicator_provider, &popover);
         popover.set_child(Some(&grid));
 
         let button = MenuButton::builder()
@@ -247,12 +251,23 @@ impl Toolbar {
             .build();
 
         const COLOR_PALETTE: &[(u8, u8, u8)] = &[
-            (255, 0, 0), (0, 255, 0), (0, 0, 255),
-            (255, 255, 0), (255, 0, 255), (0, 255, 255),
-            (255, 128, 0), (128, 255, 0), (0, 128, 255),
-            (128, 0, 255), (255, 0, 128), (0, 255, 128),
-            (192, 192, 0), (128, 128, 128), (64, 64, 64),
-            (0, 0, 0), (255, 255, 255),
+            (255, 0, 0),
+            (0, 255, 0),
+            (0, 0, 255),
+            (255, 255, 0),
+            (255, 0, 255),
+            (0, 255, 255),
+            (255, 128, 0),
+            (128, 255, 0),
+            (0, 128, 255),
+            (128, 0, 255),
+            (255, 0, 128),
+            (0, 255, 128),
+            (192, 192, 0),
+            (128, 128, 128),
+            (64, 64, 64),
+            (0, 0, 0),
+            (255, 255, 255),
         ];
 
         for (index, &(red, green, blue)) in COLOR_PALETTE.iter().enumerate() {
@@ -267,16 +282,23 @@ impl Toolbar {
 
             let provider = CssProvider::new();
             provider.load_from_data(&color_css);
-            color_button.style_context()
+            color_button
+                .style_context()
                 .add_provider(&provider, gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION);
 
             color_button.connect_clicked(clone!(
-                #[strong] tx,
-                #[strong] indicator_color,
-                #[strong] indicator_provider,
-                #[weak] popover,
+                #[strong]
+                tx,
+                #[strong]
+                indicator_color,
+                #[strong]
+                indicator_provider,
+                #[weak]
+                popover,
                 move |_| {
-                    let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetColor(red, green, blue)));
+                    let _ = tx.send(AppAction::Screenshot(ScreenshotAction::SetColor(
+                        red, green, blue,
+                    )));
 
                     indicator_color.set((red, green, blue));
                     indicator_provider.load_from_data(&color_indicator_css((red, green, blue)));
@@ -290,15 +312,14 @@ impl Toolbar {
         grid
     }
 
-    pub fn widget(&self) -> &Box { &self.container }
+    pub fn widget(&self) -> &Box {
+        &self.container
+    }
 
     pub fn update_position(&self, rect: &Rect, screen_size: (i32, i32)) {
         let allocation = self.container.allocation();
-        let position = calculate_position(
-            rect,
-            screen_size,
-            (allocation.width(), allocation.height()),
-        );
+        let position =
+            calculate_position(rect, screen_size, (allocation.width(), allocation.height()));
 
         self.container.set_margin_start(position.0);
         self.container.set_margin_top(position.1);
@@ -325,7 +346,11 @@ fn calculate_position(
     let top_y = rect.y - toolbar_h - TOOLBAR_GAP;
     (
         center_x,
-        if top_y >= TOOLBAR_GAP { top_y } else { TOOLBAR_GAP },
+        if top_y >= TOOLBAR_GAP {
+            top_y
+        } else {
+            TOOLBAR_GAP
+        },
     )
 }
 
@@ -387,41 +412,49 @@ mod tests {
 
     #[test]
     fn toolbar_uses_selection_bottom_right_when_it_fits() {
-        let rect = Rect { x: 50, y: 40, w: 100, h: 80 };
+        let rect = Rect {
+            x: 50,
+            y: 40,
+            w: 100,
+            h: 80,
+        };
 
-        assert_eq!(
-            calculate_position(&rect, (300, 300), (80, 36)),
-            (70, 128),
-        );
+        assert_eq!(calculate_position(&rect, (300, 300), (80, 36)), (70, 128),);
     }
 
     #[test]
     fn toolbar_falls_back_to_selection_top_center() {
-        let rect = Rect { x: 50, y: 200, w: 100, h: 80 };
+        let rect = Rect {
+            x: 50,
+            y: 200,
+            w: 100,
+            h: 80,
+        };
 
-        assert_eq!(
-            calculate_position(&rect, (300, 300), (80, 36)),
-            (60, 156),
-        );
+        assert_eq!(calculate_position(&rect, (300, 300), (80, 36)), (60, 156),);
     }
 
     #[test]
     fn toolbar_uses_top_margin_when_selection_has_no_room_above() {
-        let rect = Rect { x: 0, y: 0, w: 300, h: 300 };
+        let rect = Rect {
+            x: 0,
+            y: 0,
+            w: 300,
+            h: 300,
+        };
 
-        assert_eq!(
-            calculate_position(&rect, (300, 300), (80, 36)),
-            (110, 8),
-        );
+        assert_eq!(calculate_position(&rect, (300, 300), (80, 36)), (110, 8),);
     }
 
     #[test]
     fn toolbar_position_is_safe_when_toolbar_is_wider_than_screen() {
-        let rect = Rect { x: 0, y: 50, w: 100, h: 50 };
+        let rect = Rect {
+            x: 0,
+            y: 50,
+            w: 100,
+            h: 50,
+        };
 
-        assert_eq!(
-            calculate_position(&rect, (100, 200), (120, 36)),
-            (0, 108),
-        );
+        assert_eq!(calculate_position(&rect, (100, 200), (120, 36)), (0, 108),);
     }
 }

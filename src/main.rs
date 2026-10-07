@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 
 use gtk4::prelude::*;
-use gtk4::{Application, gio};
+use gtk4::{gio, Application};
 
 mod action;
 mod capture;
@@ -25,8 +25,7 @@ enum Commands {
 const APP_ID: &str = "io.github.misery8.hyprshot";
 
 fn main() {
-    gio::resources_register_include!("compiled.gresource")
-        .expect("Failed to register resources.");
+    gio::resources_register_include!("compiled.gresource").expect("Failed to register resources.");
 
     let cli = Cli::parse();
 
@@ -39,13 +38,10 @@ fn main() {
     };
 
     let app = Application::new(Some(APP_ID), gio::ApplicationFlags::FLAGS_NONE);
-        
-    app.connect_activate(move |app| {
 
-        match &command {
-            Commands::Screen => {
-                screenshot::run(app);
-            }
+    app.connect_activate(move |app| match &command {
+        Commands::Screen => {
+            screenshot::run(app);
         }
     });
 
