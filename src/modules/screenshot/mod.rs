@@ -79,14 +79,14 @@ fn handle_action(
                     s.set_mouse_pos((x, y));
                     if s.selection().is_active() {
                         cursor::update_cursor(
-                            &s.selection().rect(),
+                            s.selection().rect(),
                             s.mouse_pos(),
                             &widgets.drawing_area,
                         );
                         if s.is_paused() {
                             widgets
                                 .toolbar
-                                .update_position(&s.selection().rect(), s.screen_size());
+                                .update_position(s.selection().rect(), s.screen_size());
                         }
                     }
                 }
@@ -100,7 +100,7 @@ fn handle_action(
                     s.update_drag(x, y);
                     widgets
                         .toolbar
-                        .update_position(&s.selection().rect(), s.screen_size());
+                        .update_position(s.selection().rect(), s.screen_size());
                 }
                 ScreenshotAction::DragEnd => {
                     if let Some(shape) = s.current_shape() {
