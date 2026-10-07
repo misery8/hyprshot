@@ -190,12 +190,54 @@ pub fn draw_text(cr: &Context, position: (i32, i32), runs: &[TextRun]) {
     }
 }
 
-fn text_advance(cr: &Context, runs: &[TextRun]) -> f64 {
+#[derive(Debug, Clone, Copy)]
+struct TextLayout {
+    ink: Option<(f64, f64, f64, f64)>,
+    advance: f64,
+}
+
+fn text_layout(cr: &Context, position: (i32, i32), runs: &[TextRun]) -> Option<TextLayout> {
     configure_text_font(cr);
-    runs.iter()
-        .filter_map(|run| cr.text_extents(run.text()).ok())
-        .map(|extents| extents.x_advance())
-        .sum()
+
+    let mut cursor_x = position.0 as f64;
+    let mut ink: Option<(f64, f64, f64, f64)> = None;
+
+    for run in runs {
+        if run.text().is_empty() {
+            continue;
+        }
+
+        let extents = cr.text_extents(run.text()).ok()?;
+        if extents.width() > 0.0 && extents.height() > 0.0 {
+            let left = cursor_x + extents.x_bearing();
+            let top = position.1 as f64 + extents.y_bearing();
+            let right = left + extents.width();
+            let bottom = top + extents.height();
+
+            ink = Some(match ink {
+                Some((ink_left, ink_top, ink_right, ink_bottom)) => (
+                    ink_left.min(left),
+                    ink_top.min(top),
+                    ink_right.max(right),
+                    ink_bottom.max(bottom),
+                ),
+                None => (left, top, right, bottom),
+            });
+        }
+
+        cursor_x += extents.x_advance();
+    }
+
+    Some(TextLayout {
+        ink,
+        advance: cursor_x - position.0 as f64,
+    })
+}
+
+fn text_advance(cr: &Context, runs: &[TextRun]) -> f64 {
+    text_layout(cr, (0, 0), runs)
+        .map(|layout| layout.advance)
+        .unwrap_or(0.0)
 }
 
 fn draw_caret(cr: &Context, caret_x: f64, baseline_y: f64) {
@@ -233,24 +275,42 @@ pub fn draw_text_preview(
 }
 
 pub fn text_bounds(cr: &Context, position: (i32, i32), runs: &[TextRun]) -> Option<Rect> {
-    let mut text = String::new();
-    for run in runs {
-        text.push_str(run.text());
+    let layout = text_layout(cr, position, runs)?;
+    let (ink_left, ink_top, ink_right, ink_bottom) = layout.ink?;
+
+    let left = ink_left.floor() as i32 - TEXT_BOUNDS_PADDING;
+    let top = ink_top.floor() as i32 - TEXT_BOUNDS_PADDING;
+    let right = ink_right.ceil() as i32 + TEXT_BOUNDS_PADDING;
+    let bottom = ink_bottom.ceil() as i32 + TEXT_BOUNDS_PADDING;
+
+    Some(Rect {
+        x: left,
+        y: top,
+        w: (right - left).max(1),
+        h: (bottom - top).max(1),
+    })
+}
+
+pub fn text_preview_bounds(
+    cr: &Context,
+    position: (i32, i32),
+    runs: &[TextRun],
+) -> Option<Rect> {
+    let layout = text_layout(cr, position, runs)?;
+    let caret_x = position.0 as f64 + layout.advance + 1.0;
+    let caret_half_width = CARET_OUTLINE_WIDTH / 2.0;
+
+    let mut left = (caret_x - caret_half_width).floor() as i32;
+    let mut top = (position.1 as f64 - TEXT_FONT_SIZE).floor() as i32;
+    let mut right = (caret_x + caret_half_width).ceil() as i32;
+    let mut bottom = (position.1 as f64 + 3.0).ceil() as i32;
+
+    if let Some((ink_left, ink_top, ink_right, ink_bottom)) = layout.ink {
+        left = left.min(ink_left.floor() as i32 - TEXT_BOUNDS_PADDING);
+        top = top.min(ink_top.floor() as i32 - TEXT_BOUNDS_PADDING);
+        right = right.max(ink_right.ceil() as i32 + TEXT_BOUNDS_PADDING);
+        bottom = bottom.max(ink_bottom.ceil() as i32 + TEXT_BOUNDS_PADDING);
     }
-
-    if text.is_empty() {
-        return None;
-    }
-
-    configure_text_font(cr);
-    let extents = cr.text_extents(&text).ok()?;
-
-    let left = (position.0 as f64 + extents.x_bearing()).floor() as i32 - TEXT_BOUNDS_PADDING;
-    let top = (position.1 as f64 + extents.y_bearing()).floor() as i32 - TEXT_BOUNDS_PADDING;
-    let right = (position.0 as f64 + extents.x_bearing() + extents.width()).ceil() as i32
-        + TEXT_BOUNDS_PADDING;
-    let bottom = (position.1 as f64 + extents.y_bearing() + extents.height()).ceil() as i32
-        + TEXT_BOUNDS_PADDING;
 
     Some(Rect {
         x: left,
@@ -283,6 +343,63 @@ pub fn draw_blur(surface: &ImageSurface, cr: &Context, rect: &Rect) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn containment_test_glyph_has_negative_x_bearing() {
+        let surface = ImageSurface::create(cairo::Format::ARgb32, 1, 1).unwrap();
+        let cr = Context::new(&surface).unwrap();
+        configure_text_font(&cr);
+
+        let extents = cr.text_extents("j").unwrap();
+        assert!(
+            extents.x_bearing() < 0.0,
+            "test precondition requires a negative-bearing glyph"
+        );
+    }
+
+    #[test]
+    fn text_bounds_follow_run_by_run_layout() {
+        let surface = ImageSurface::create(cairo::Format::ARgb32, 1, 1).unwrap();
+        let cr = Context::new(&surface).unwrap();
+        configure_text_font(&cr);
+
+        let position = (50, 60);
+        let first = cr.text_extents("A").unwrap();
+        let second = cr.text_extents("V").unwrap();
+        let second_x = position.0 as f64 + first.x_advance();
+
+        let left = (position.0 as f64 + first.x_bearing())
+            .min(second_x + second.x_bearing())
+            .floor() as i32
+            - TEXT_BOUNDS_PADDING;
+        let top = (position.1 as f64 + first.y_bearing())
+            .min(position.1 as f64 + second.y_bearing())
+            .floor() as i32
+            - TEXT_BOUNDS_PADDING;
+        let right = (position.0 as f64 + first.x_bearing() + first.width())
+            .max(second_x + second.x_bearing() + second.width())
+            .ceil() as i32
+            + TEXT_BOUNDS_PADDING;
+        let bottom = (position.1 as f64 + first.y_bearing() + first.height())
+            .max(position.1 as f64 + second.y_bearing() + second.height())
+            .ceil() as i32
+            + TEXT_BOUNDS_PADDING;
+
+        let runs = [
+            TextRun::new("A".to_string(), (255, 0, 0)),
+            TextRun::new("V".to_string(), (0, 255, 0)),
+        ];
+
+        assert_eq!(
+            text_bounds(&cr, position, &runs),
+            Some(Rect {
+                x: left,
+                y: top,
+                w: right - left,
+                h: bottom - top,
+            })
+        );
+    }
 
     #[test]
     fn selection_handles_match_demo_positions() {

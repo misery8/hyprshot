@@ -89,7 +89,8 @@ impl ScreenshotState {
             if self.paused && self.selection.is_active() && self.selection.rect.contains((x, y)) {
                 self.current_shape = None;
                 self.drag_start = None;
-                self.text_input = Some(TextInput::new((x, y)));
+                self.text_input =
+                    Self::clamped_text_position((x, y), &self.selection.rect).map(TextInput::new);
             }
             return;
         }
@@ -166,7 +167,9 @@ impl ScreenshotState {
     pub fn append_text(&mut self, ch: char) {
         let selection = self.selection.rect;
         let color = self.current_color;
-        let Some(input) = self.text_input.as_mut() else { return; };
+        let Some(input) = self.text_input.as_mut() else {
+            return;
+        };
 
         let mut candidate = input.clone();
         candidate.append(ch, color);
@@ -176,40 +179,52 @@ impl ScreenshotState {
         }
     }
 
+    fn text_preview_bounds(input: &TextInput) -> Option<Rect> {
+        let surface = ImageSurface::create(Format::ARgb32, 1, 1).ok()?;
+        let cr = Context::new(&surface).ok()?;
+        render::text_preview_bounds(&cr, input.position, &input.runs)
+    }
+
+    fn clamped_text_position(
+        requested: (i32, i32),
+        selection: &Rect,
+    ) -> Option<(i32, i32)> {
+        if selection.w <= 0 || selection.h <= 0 {
+            return None;
+        }
+
+        let probe = TextInput::new(requested);
+        let bounds = Self::text_preview_bounds(&probe)?;
+        if bounds.w > selection.w || bounds.h > selection.h {
+            return None;
+        }
+
+        let dx = if bounds.x < selection.x {
+            selection.x - bounds.x
+        } else if bounds.right() > selection.right() {
+            selection.right() - bounds.right()
+        } else {
+            0
+        };
+        let dy = if bounds.y < selection.y {
+            selection.y - bounds.y
+        } else if bounds.bottom() > selection.bottom() {
+            selection.bottom() - bounds.bottom()
+        } else {
+            0
+        };
+
+        let position = (requested.0 + dx, requested.1 + dy);
+        let adjusted = TextInput::new(position);
+        let adjusted_bounds = Self::text_preview_bounds(&adjusted)?;
+
+        selection.contains_rect(&adjusted_bounds).then_some(position)
+    }
+
     fn text_input_fits_selection(input: &TextInput, selection: &Rect) -> bool {
-        let Ok(surface) = ImageSurface::create(Format::ARgb32, 1, 1) else {
-            return false;
-        };
-        let Ok(cr) = Context::new(&surface) else {
-            return false;
-        };
-
-        // Reuse the renderer's font setup so input validation matches the
-        // actual preview/commit typography.
-        if render::text_bounds(&cr, input.position, &input.runs).is_none() {
-            return false;
-        }
-
-        let mut cursor_x = input.position.0 as f64;
-        let mut right = cursor_x;
-
-        for run in &input.runs {
-            let Ok(extents) = cr.text_extents(run.text()) else {
-                return false;
-            };
-
-            right = right.max(
-                cursor_x + extents.x_bearing() + extents.width()
-            );
-            cursor_x += extents.x_advance();
-        }
-
-        // Ink extents ignore trailing spaces; the caret position does not.
-        // Guard the caret too so invisible whitespace cannot accumulate
-        // beyond the selection's right edge.
-        right = right.max(cursor_x + 1.0);
-
-        right <= selection.right() as f64
+        Self::text_preview_bounds(input)
+            .map(|bounds| selection.contains_rect(&bounds))
+            .unwrap_or(false)
     }
 
     pub fn backspace_text(&mut self) {
@@ -409,7 +424,7 @@ impl ScreenshotState {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextInput {
     position: (i32, i32),
     text: String,
@@ -553,6 +568,13 @@ impl Rect {
 
     pub fn contains(&self, (x, y): (i32, i32)) -> bool {
         x >= self.x && x < self.right() && y >= self.y && y < self.bottom()
+    }
+
+    fn contains_rect(&self, other: &Rect) -> bool {
+        other.x >= self.x
+            && other.y >= self.y
+            && other.right() <= self.right()
+            && other.bottom() <= self.bottom()
     }
 
     pub fn as_f64(&self) -> (f64, f64, f64, f64) {
@@ -1019,6 +1041,174 @@ mod tests {
         );
     }
 
+    fn assert_text_preview_fits(input: &TextInput, selection: &Rect) {
+        let bounds = ScreenshotState::text_preview_bounds(input)
+            .expect("text preview bounds should be measurable");
+        assert!(
+            selection.contains_rect(&bounds),
+            "preview bounds {:?} must stay inside selection {:?}",
+            bounds,
+            selection
+        );
+    }
+
+    fn rendered_text_preview_png(
+        input: &TextInput,
+        selection: &Rect,
+        clipped: bool,
+    ) -> Vec<u8> {
+        let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 200, 160).unwrap();
+        let cr = cairo::Context::new(&surface).unwrap();
+        cr.set_source_rgb(1.0, 1.0, 1.0);
+        cr.paint().unwrap();
+
+        if clipped {
+            let (x, y, w, h) = selection.as_f64();
+            cr.save().unwrap();
+            cr.rectangle(x, y, w, h);
+            cr.clip();
+        }
+
+        render::draw_text_preview(&cr, input.position(), input.runs(), true);
+
+        if clipped {
+            cr.restore().unwrap();
+        }
+
+        let mut bytes = Vec::new();
+        surface.write_to_png(&mut bytes).unwrap();
+        bytes
+    }
+
+    #[test]
+    fn text_start_clamps_empty_caret_at_top_and_bottom_edges() {
+        let rect = Rect {
+            x: 20,
+            y: 30,
+            w: 120,
+            h: 80,
+        };
+
+        for (click_y, moves_down) in [(rect.y, true), (rect.bottom() - 1, false)] {
+            let mut state = paused_state_with_rect(rect, (200, 200));
+            let _ = state.set_tool(Tool::Text);
+            state.begin_drag(80, click_y);
+
+            let input = state.text_input().expect("text input should start");
+            assert_text_preview_fits(input, &rect);
+            if moves_down {
+                assert!(input.position().1 > click_y);
+            } else {
+                assert!(input.position().1 < click_y);
+            }
+        }
+    }
+
+    #[test]
+    fn text_start_clamps_empty_caret_at_all_corners() {
+        let rect = Rect {
+            x: 20,
+            y: 30,
+            w: 120,
+            h: 80,
+        };
+
+        for click in [
+            (rect.x, rect.y),
+            (rect.right() - 1, rect.y),
+            (rect.x, rect.bottom() - 1),
+            (rect.right() - 1, rect.bottom() - 1),
+        ] {
+            let mut state = paused_state_with_rect(rect, (200, 200));
+            let _ = state.set_tool(Tool::Text);
+            state.begin_drag(click.0, click.1);
+
+            let input = state.text_input().expect("text input should start");
+            assert_text_preview_fits(input, &rect);
+        }
+    }
+
+    #[test]
+    fn text_does_not_start_when_selection_cannot_fit_empty_caret() {
+        let rect = Rect {
+            x: 20,
+            y: 30,
+            w: 3,
+            h: 20,
+        };
+        let mut state = paused_state_with_rect(rect, (200, 200));
+        let _ = state.set_tool(Tool::Text);
+
+        state.begin_drag(21, 31);
+
+        assert!(state.text_input().is_none());
+    }
+
+    #[test]
+    fn negative_bearing_character_is_rejected_from_stable_left_edge_baseline() {
+        let rect = Rect {
+            x: 20,
+            y: 30,
+            w: 120,
+            h: 80,
+        };
+        let mut state = paused_state_with_rect(rect, (200, 200));
+        let _ = state.set_tool(Tool::Text);
+        state.begin_drag(rect.x, 70);
+
+        let before = state.text_input().unwrap().clone();
+        let mut candidate = before.clone();
+        candidate.append('j', state.current_color);
+        let candidate_bounds =
+            ScreenshotState::text_preview_bounds(&candidate).expect("candidate bounds");
+        assert!(!rect.contains_rect(&candidate_bounds));
+
+        state.append_text('j');
+
+        assert_eq!(state.text_input().unwrap(), &before);
+    }
+
+    #[test]
+    fn negative_bearing_character_fits_when_baseline_has_room() {
+        let rect = Rect {
+            x: 20,
+            y: 30,
+            w: 120,
+            h: 80,
+        };
+        let mut state = paused_state_with_rect(rect, (200, 200));
+        let _ = state.set_tool(Tool::Text);
+        state.begin_drag(rect.x + 20, 70);
+
+        state.append_text('j');
+
+        let input = state.text_input().unwrap();
+        assert_eq!(input.text(), "j");
+        assert_text_preview_fits(input, &rect);
+    }
+
+    #[test]
+    fn clipped_and_unclipped_accepted_text_preview_are_pixel_identical() {
+        let rect = Rect {
+            x: 20,
+            y: 30,
+            w: 120,
+            h: 80,
+        };
+        let mut state = paused_state_with_rect(rect, (200, 160));
+        let _ = state.set_tool(Tool::Text);
+        state.begin_drag(80, rect.y);
+        state.append_text('A');
+
+        let input = state.text_input().expect("text input should start");
+        assert_eq!(input.text(), "A");
+        assert_text_preview_fits(input, &rect);
+        assert_eq!(
+            rendered_text_preview_png(input, &rect, false),
+            rendered_text_preview_png(input, &rect, true)
+        );
+    }
+
     #[test]
     fn text_tool_click_starts_text_input_inside_selection() {
         let rect = Rect {
@@ -1030,10 +1220,10 @@ mod tests {
         let mut state = paused_state_with_rect(rect, (200, 200));
         let _ = state.set_tool(Tool::Text);
 
-        state.begin_drag(40, 50);
+        state.begin_drag(40, 60);
 
         let input = state.text_input().expect("text input should start");
-        assert_eq!(input.position(), (40, 50));
+        assert_eq!(input.position(), (40, 60));
         assert_eq!(input.text(), "");
     }
 
@@ -1082,12 +1272,13 @@ mod tests {
             state.append_text('W');
         }
 
-        let stopped = state.text_input().unwrap().text().to_string();
-        assert!(!stopped.is_empty());
-        assert!(stopped.len() < 100);
+        let stopped = state.text_input().unwrap().clone();
+        assert!(!stopped.text().is_empty());
+        assert!(stopped.text().len() < 100);
+        assert_text_preview_fits(&stopped, &rect);
 
         state.append_text('W');
-        assert_eq!(state.text_input().unwrap().text(), stopped);
+        assert_eq!(state.text_input().unwrap(), &stopped);
     }
 
     #[test]
@@ -1106,11 +1297,40 @@ mod tests {
             state.append_text(' ');
         }
 
-        let stopped = state.text_input().unwrap().text().to_string();
-        assert!(stopped.len() < 100);
+        let stopped = state.text_input().unwrap().clone();
+        assert!(stopped.text().len() < 100);
+        assert_text_preview_fits(&stopped, &rect);
 
         state.append_text(' ');
-        assert_eq!(state.text_input().unwrap().text(), stopped);
+        assert_eq!(state.text_input().unwrap(), &stopped);
+    }
+
+    #[test]
+    fn backspace_restores_capacity_after_boundary_rejection() {
+        let rect = Rect {
+            x: 20,
+            y: 30,
+            w: 120,
+            h: 80,
+        };
+        let mut state = paused_state_with_rect(rect, (200, 200));
+        let _ = state.set_tool(Tool::Text);
+        state.begin_drag(40, 70);
+
+        for _ in 0..100 {
+            state.append_text('W');
+        }
+
+        let full = state.text_input().unwrap().clone();
+        state.append_text('W');
+        assert_eq!(state.text_input().unwrap(), &full);
+
+        state.backspace_text();
+        assert_ne!(state.text_input().unwrap(), &full);
+        state.append_text('W');
+
+        assert_eq!(state.text_input().unwrap(), &full);
+        assert_text_preview_fits(state.text_input().unwrap(), &rect);
     }
 
     #[test]
@@ -1141,6 +1361,7 @@ mod tests {
         assert_eq!(input.runs()[0].color(), (255, 0, 0));
         assert_eq!(input.runs()[1].text(), "B");
         assert_eq!(input.runs()[1].color(), (12, 34, 56));
+        assert_text_preview_fits(input, &rect);
 
         let shape = state.commit_text().expect("colored text should commit");
         assert!(matches!(
