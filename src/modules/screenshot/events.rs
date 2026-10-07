@@ -136,4 +136,3 @@ pub fn init_events(tx: Sender<AppAction>, widgets: &ScreenshotWidgets) {
 
     widgets.window.add_controller(key_controller);
 }
-
