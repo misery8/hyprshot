@@ -229,7 +229,15 @@ mod tests {
     fn applying_valid_shape_creates_undo_entry() {
         let canvas = test_canvas(100, 100);
 
-        canvas.apply_shape(&valid_rectangle(), &Rect { x: 0, y: 0, w: 100, h: 100 });
+        canvas.apply_shape(
+            &valid_rectangle(),
+            &Rect {
+                x: 0,
+                y: 0,
+                w: 100,
+                h: 100,
+            },
+        );
 
         assert_eq!(canvas.history.borrow().len(), 1);
     }
@@ -239,7 +247,15 @@ mod tests {
         let canvas = test_canvas(100, 100);
         let before = surface_png(&canvas);
 
-        canvas.apply_shape(&valid_rectangle(), &Rect { x: 0, y: 0, w: 100, h: 100 });
+        canvas.apply_shape(
+            &valid_rectangle(),
+            &Rect {
+                x: 0,
+                y: 0,
+                w: 100,
+                h: 100,
+            },
+        );
         let after = surface_png(&canvas);
         assert_ne!(after, before);
 
@@ -252,7 +268,15 @@ mod tests {
     fn undo_snapshot_is_smaller_than_canvas_for_local_shape() {
         let canvas = test_canvas(100, 100);
 
-        canvas.apply_shape(&valid_rectangle(), &Rect { x: 0, y: 0, w: 100, h: 100 });
+        canvas.apply_shape(
+            &valid_rectangle(),
+            &Rect {
+                x: 0,
+                y: 0,
+                w: 100,
+                h: 100,
+            },
+        );
 
         let history = canvas.history.borrow();
         let snapshot = &history[0];
@@ -264,9 +288,19 @@ mod tests {
     fn applying_shape_does_not_modify_pixels_outside_selection() {
         let canvas = test_canvas(100, 100);
         let before = surface_png(&canvas);
-        let selection = Rect { x: 20, y: 20, w: 40, h: 40 };
+        let selection = Rect {
+            x: 20,
+            y: 20,
+            w: 40,
+            h: 40,
+        };
         let shape = Shape::Rectangle {
-            rect: Rect { x: 30, y: 30, w: 50, h: 50 },
+            rect: Rect {
+                x: 30,
+                y: 30,
+                w: 50,
+                h: 50,
+            },
             color: (0, 0, 0),
         };
 
@@ -320,7 +354,12 @@ mod tests {
     fn overflowing_arrow_does_not_modify_pixels_outside_selection() {
         let canvas = test_canvas(100, 100);
         let before = surface_png(&canvas);
-        let selection = Rect { x: 20, y: 20, w: 40, h: 40 };
+        let selection = Rect {
+            x: 20,
+            y: 20,
+            w: 40,
+            h: 40,
+        };
         let shape = Shape::Arrow {
             from: (30, 30),
             to: (90, 90),
@@ -360,7 +399,15 @@ mod tests {
     fn text_shape_uses_regional_undo_snapshot() {
         let canvas = test_canvas(200, 100);
 
-        canvas.apply_shape(&valid_text(), &Rect { x: 0, y: 0, w: 200, h: 100 });
+        canvas.apply_shape(
+            &valid_text(),
+            &Rect {
+                x: 0,
+                y: 0,
+                w: 200,
+                h: 100,
+            },
+        );
 
         let history = canvas.history.borrow();
         assert_eq!(history.len(), 1);

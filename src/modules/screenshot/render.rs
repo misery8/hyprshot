@@ -32,10 +32,7 @@ pub(crate) fn arrow_head_offsets(angle: f64) -> [(f64, f64); 2] {
     ]
 }
 
-pub(crate) fn arrow_head_points(
-    from: (i32, i32),
-    to: (i32, i32),
-) -> [(f64, f64); 2] {
+pub(crate) fn arrow_head_points(from: (i32, i32), to: (i32, i32)) -> [(f64, f64); 2] {
     let angle = ((to.1 - from.1) as f64).atan2((to.0 - from.0) as f64);
     let offsets = arrow_head_offsets(angle);
 
@@ -119,19 +116,15 @@ pub fn draw_shape(surface: &ImageSurface, cr: &Context, shape: &Shape) {
     }
 }
 
-pub fn draw_shape_clipped(
-    surface: &ImageSurface,
-    cr: &Context,
-    shape: &Shape,
-    clip: &Rect,
-) {
+pub fn draw_shape_clipped(surface: &ImageSurface, cr: &Context, shape: &Shape, clip: &Rect) {
     let (x, y, w, h) = clip.as_f64();
 
     cr.save().expect("Failed to save annotation clip context");
     cr.rectangle(x, y, w, h);
     cr.clip();
     draw_shape(surface, cr, shape);
-    cr.restore().expect("Failed to restore annotation clip context");
+    cr.restore()
+        .expect("Failed to restore annotation clip context");
 }
 
 pub fn draw_arrow(cr: &Context, from: (i32, i32), to: (i32, i32), color: (u8, u8, u8)) {
@@ -291,11 +284,7 @@ pub fn text_bounds(cr: &Context, position: (i32, i32), runs: &[TextRun]) -> Opti
     })
 }
 
-pub fn text_preview_bounds(
-    cr: &Context,
-    position: (i32, i32),
-    runs: &[TextRun],
-) -> Option<Rect> {
+pub fn text_preview_bounds(cr: &Context, position: (i32, i32), runs: &[TextRun]) -> Option<Rect> {
     let layout = text_layout(cr, position, runs)?;
     let caret_x = position.0 as f64 + layout.advance + 1.0;
     let caret_half_width = CARET_OUTLINE_WIDTH / 2.0;
@@ -403,7 +392,12 @@ mod tests {
 
     #[test]
     fn selection_handles_match_demo_positions() {
-        let rect = Rect { x: 10, y: 20, w: 100, h: 80 };
+        let rect = Rect {
+            x: 10,
+            y: 20,
+            w: 100,
+            h: 80,
+        };
 
         assert_eq!(
             selection_handle_positions(&rect),

@@ -185,10 +185,7 @@ impl ScreenshotState {
         render::text_preview_bounds(&cr, input.position, &input.runs)
     }
 
-    fn clamped_text_position(
-        requested: (i32, i32),
-        selection: &Rect,
-    ) -> Option<(i32, i32)> {
+    fn clamped_text_position(requested: (i32, i32), selection: &Rect) -> Option<(i32, i32)> {
         if selection.w <= 0 || selection.h <= 0 {
             return None;
         }
@@ -218,7 +215,9 @@ impl ScreenshotState {
         let adjusted = TextInput::new(position);
         let adjusted_bounds = Self::text_preview_bounds(&adjusted)?;
 
-        selection.contains_rect(&adjusted_bounds).then_some(position)
+        selection
+            .contains_rect(&adjusted_bounds)
+            .then_some(position)
     }
 
     fn text_input_fits_selection(input: &TextInput, selection: &Rect) -> bool {
@@ -259,9 +258,10 @@ impl ScreenshotState {
         match self.current_tool {
             Tool::Arrow => self.constrained_arrow(from, to),
             Tool::Rectangle => {
-                let safe = self.selection.rect.inset(
-                    render::stroke_padding(render::RECTANGLE_LINE_WIDTH)
-                )?;
+                let safe = self
+                    .selection
+                    .rect
+                    .inset(render::stroke_padding(render::RECTANGLE_LINE_WIDTH))?;
                 let from = safe.clamp_point(from);
                 let to = safe.clamp_point(to);
 
@@ -280,14 +280,11 @@ impl ScreenshotState {
         }
     }
 
-    fn constrained_arrow(
-        &self,
-        raw_from: (i32, i32),
-        raw_to: (i32, i32),
-    ) -> Option<Shape> {
-        let safe = self.selection.rect.inset(
-            render::stroke_padding(render::ARROW_LINE_WIDTH)
-        )?;
+    fn constrained_arrow(&self, raw_from: (i32, i32), raw_to: (i32, i32)) -> Option<Shape> {
+        let safe = self
+            .selection
+            .rect
+            .inset(render::stroke_padding(render::ARROW_LINE_WIDTH))?;
         let from = safe.clamp_point(raw_from);
 
         let raw_dx = (raw_to.0 - raw_from.0) as f64;
@@ -403,11 +400,7 @@ impl ScreenshotState {
         Some((entry.max(0.0), exit))
     }
 
-    fn arrow_geometry_fits(
-        from: (i32, i32),
-        to: (i32, i32),
-        safe: &Rect,
-    ) -> bool {
+    fn arrow_geometry_fits(from: (i32, i32), to: (i32, i32), safe: &Rect) -> bool {
         if !safe.contains_closed((from.0 as f64, from.1 as f64))
             || !safe.contains_closed((to.0 as f64, to.1 as f64))
         {
@@ -935,7 +928,12 @@ mod tests {
 
     #[test]
     fn arrow_drag_toward_each_edge_is_fully_rendered_inside_selection() {
-        let rect = Rect { x: 20, y: 20, w: 120, h: 100 };
+        let rect = Rect {
+            x: 20,
+            y: 20,
+            w: 120,
+            h: 100,
+        };
         let start = (80, 70);
 
         for target in [(80, -100), (80, 300), (-100, 70), (300, 70)] {
@@ -951,15 +949,15 @@ mod tests {
 
     #[test]
     fn diagonal_arrow_drag_preserves_direction_and_rendered_bounds() {
-        let rect = Rect { x: 20, y: 20, w: 120, h: 100 };
+        let rect = Rect {
+            x: 20,
+            y: 20,
+            w: 120,
+            h: 100,
+        };
         let start = (80, 70);
 
-        for target in [
-            (-100, -100),
-            (300, -100),
-            (-100, 300),
-            (300, 300),
-        ] {
+        for target in [(-100, -100), (300, -100), (-100, 300), (300, 300)] {
             let mut state = paused_state_with_rect(rect, (200, 160));
             let _ = state.set_tool(Tool::Arrow);
             state.begin_drag(start.0, start.1);
@@ -988,7 +986,12 @@ mod tests {
 
     #[test]
     fn rectangle_drag_toward_each_edge_is_fully_rendered_inside_selection() {
-        let rect = Rect { x: 20, y: 20, w: 120, h: 100 };
+        let rect = Rect {
+            x: 20,
+            y: 20,
+            w: 120,
+            h: 100,
+        };
         let start = (80, 70);
 
         for target in [(110, -100), (110, 300), (-100, 90), (300, 90)] {
@@ -997,7 +1000,9 @@ mod tests {
             state.begin_drag(start.0, start.1);
             state.update_drag(target.0 - start.0, target.1 - start.1);
 
-            let shape = state.current_shape().expect("contained rectangle should exist");
+            let shape = state
+                .current_shape()
+                .expect("contained rectangle should exist");
             assert_render_fits_selection(shape, &rect);
         }
     }
@@ -1036,7 +1041,12 @@ mod tests {
         assert_eq!(
             state.current_shape(),
             Some(&Shape::Blur {
-                rect: Rect { x: 20, y: 30, w: 80, h: 60 },
+                rect: Rect {
+                    x: 20,
+                    y: 30,
+                    w: 80,
+                    h: 60
+                },
             })
         );
     }
@@ -1052,11 +1062,7 @@ mod tests {
         );
     }
 
-    fn rendered_text_preview_png(
-        input: &TextInput,
-        selection: &Rect,
-        clipped: bool,
-    ) -> Vec<u8> {
+    fn rendered_text_preview_png(input: &TextInput, selection: &Rect, clipped: bool) -> Vec<u8> {
         let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 200, 160).unwrap();
         let cr = cairo::Context::new(&surface).unwrap();
         cr.set_source_rgb(1.0, 1.0, 1.0);

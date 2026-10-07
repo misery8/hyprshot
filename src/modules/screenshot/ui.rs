@@ -29,7 +29,6 @@ impl ScreenshotWidgets {
         state: Rc<RefCell<ScreenshotState>>,
         canvas: Rc<Canvas>,
     ) -> Self {
-
         // let da_size = {
         //     let surf = canvas.surface.borrow();
         //     (surf.width(), surf.height())
@@ -74,7 +73,6 @@ impl ScreenshotWidgets {
     }
 
     fn setup_layout(da: &DrawingArea, toolbar_widget: &gtk4::Box) -> Overlay {
-
         let overlay = Overlay::new();
         overlay.set_vexpand(true);
         overlay.set_hexpand(true);
@@ -146,12 +144,7 @@ impl ScreenshotWidgets {
             }
 
             if let Some(shape) = state.current_shape() {
-                render::draw_shape_clipped(
-                    &surface,
-                    cr,
-                    shape,
-                    state.selection().rect(),
-                );
+                render::draw_shape_clipped(&surface, cr, shape, state.selection().rect());
             }
 
             if let Some(input) = state.text_input() {
@@ -166,5 +159,4 @@ impl ScreenshotWidgets {
             }
         });
     }
-
 }
