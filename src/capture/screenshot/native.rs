@@ -1,17 +1,19 @@
 use std::{
     collections::HashMap,
-    fs::{remove_file, File, OpenOptions},
+    fs::File,
     io::{Read, Seek, SeekFrom},
     os::fd::AsFd,
-    path::PathBuf,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, Mutex, MutexGuard,
-    },
+    sync::{Arc, Mutex, MutexGuard},
 };
 
 use anyhow::{anyhow, bail, ensure, Context as AnyhowContext, Result};
-use cairo::{Context as CairoContext, Filter, Format as CairoFormat, ImageSurface, Operator};
+use cairo::{
+    Context as CairoContext, Extend, Filter, Format as CairoFormat, ImageSurface, Operator,
+};
+use nix::{
+    sys::memfd::{memfd_create, MFdFlags},
+    unistd::ftruncate,
+};
 use wayland_client::{
     protocol::{
         wl_buffer::WlBuffer,
@@ -46,8 +48,6 @@ use wayland_protocols_wlr::screencopy::v1::client::{
 };
 
 const BYTES_PER_PIXEL: u32 = 4;
-const SCALE_EPSILON: f64 = 1.0e-6;
-static SHM_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BackendKind {
@@ -507,37 +507,13 @@ impl ShmBuffer {
 
 fn create_shm_file(size: usize) -> Result<File> {
     ensure!(size > 0, "cannot allocate an empty Wayland SHM buffer");
-    let size = u64::try_from(size).context("SHM size exceeds u64")?;
 
-    for _ in 0..32 {
-        let counter = SHM_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let path = temporary_shm_path(counter);
-        match OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create_new(true)
-            .open(&path)
-        {
-            Ok(file) => {
-                if let Err(error) = file.set_len(size) {
-                    let _ = remove_file(&path);
-                    return Err(error).context("failed to size Wayland SHM file");
-                }
-                if let Err(error) = remove_file(&path) {
-                    return Err(error).context("failed to unlink Wayland SHM file");
-                }
-                return Ok(file);
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(error) => return Err(error).context("failed to create Wayland SHM file"),
-        }
-    }
+    let memfd = memfd_create("hyprshot", MFdFlags::MFD_CLOEXEC)
+        .context("failed to create anonymous Wayland SHM memfd")?;
+    let size = i64::try_from(size).context("SHM size exceeds off_t")?;
+    ftruncate(&memfd, size).context("failed to size anonymous Wayland SHM memfd")?;
 
-    bail!("failed to create a unique Wayland SHM file")
-}
-
-fn temporary_shm_path(counter: u64) -> PathBuf {
-    std::env::temp_dir().join(format!("hyprshot-shm-{}-{counter}", std::process::id()))
+    Ok(File::from(memfd))
 }
 
 fn checked_buffer_size(stride: u32, height: u32) -> Result<usize> {
@@ -707,6 +683,24 @@ fn apply_transform(image: PixelImage, transform: Transform) -> Result<PixelImage
     })
 }
 
+fn scale_interval(buffer: u32, logical: i32) -> Result<(f64, f64)> {
+    ensure!(
+        buffer > 0 && logical > 0,
+        "scale dimensions must be positive"
+    );
+
+    let logical = f64::from(logical);
+    let buffer = f64::from(buffer);
+    let minimum = buffer / (logical + 0.5);
+    let maximum = buffer / (logical - 0.5);
+
+    ensure!(
+        minimum.is_finite() && maximum.is_finite() && minimum > 0.0 && maximum >= minimum,
+        "invalid rounded scale interval"
+    );
+    Ok((minimum, maximum))
+}
+
 fn effective_scale(output: &CapturedOutput) -> Result<f64> {
     ensure!(
         output.logical.width > 0 && output.logical.height > 0,
@@ -716,15 +710,17 @@ fn effective_scale(output: &CapturedOutput) -> Result<f64> {
 
     let scale_x = f64::from(output.image.width) / f64::from(output.logical.width);
     let scale_y = f64::from(output.image.height) / f64::from(output.logical.height);
+    let (x_min, x_max) = scale_interval(output.image.width, output.logical.width)?;
+    let (y_min, y_max) = scale_interval(output.image.height, output.logical.height)?;
+    let overlap_min = x_min.max(y_min);
+    let overlap_max = x_max.min(y_max);
+
     ensure!(
-        scale_x.is_finite() && scale_y.is_finite() && scale_x > 0.0 && scale_y > 0.0,
-        "invalid effective output scale"
+        overlap_min <= overlap_max,
+        "output has inconsistent rounded effective X/Y scale ({scale_x} vs {scale_y})"
     );
-    ensure!(
-        (scale_x - scale_y).abs() <= SCALE_EPSILON,
-        "output has inconsistent effective X/Y scale ({scale_x} vs {scale_y})"
-    );
-    Ok((scale_x + scale_y) / 2.0)
+
+    Ok(((scale_x + scale_y) / 2.0).clamp(overlap_min, overlap_max))
 }
 
 fn build_composition_plan(outputs: &[CapturedOutput]) -> Result<CompositionPlan> {
@@ -864,7 +860,9 @@ fn compose_outputs(outputs: &[CapturedOutput]) -> Result<ImageSurface> {
         );
         cr.set_source_surface(&source, 0.0, 0.0)
             .context("failed to set captured output as Cairo source")?;
-        cr.source().set_filter(Filter::Best);
+        let source_pattern = cr.source();
+        source_pattern.set_filter(Filter::Best);
+        source_pattern.set_extend(Extend::Pad);
         cr.paint().context("failed to compose captured output")?;
         cr.restore()
             .context("failed to restore composition context")?;

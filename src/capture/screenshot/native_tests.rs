@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::{cell::Cell, os::fd::AsRawFd};
 
 use super::*;
 
@@ -16,6 +16,43 @@ fn image(width: u32, height: u32) -> PixelImage {
         height,
         data,
     }
+}
+
+fn solid_image(width: u32, height: u32, value: u32) -> PixelImage {
+    let pixel = pixel(value);
+    PixelImage {
+        width,
+        height,
+        data: pixel.repeat((width * height) as usize),
+    }
+}
+
+fn captured_solid(
+    x: i32,
+    y: i32,
+    logical_width: i32,
+    logical_height: i32,
+    pixel_width: u32,
+    pixel_height: u32,
+    value: u32,
+) -> CapturedOutput {
+    CapturedOutput {
+        logical: LogicalRect {
+            x,
+            y,
+            width: logical_width,
+            height: logical_height,
+        },
+        image: solid_image(pixel_width, pixel_height, value),
+    }
+}
+
+fn surface_pixel(surface: &mut ImageSurface, x: i32, y: i32) -> u32 {
+    let stride = surface.stride() as usize;
+    surface.flush();
+    let data = surface.data().unwrap();
+    let offset = y as usize * stride + x as usize * 4;
+    u32::from_ne_bytes(data[offset..offset + 4].try_into().unwrap())
 }
 
 fn captured(
@@ -79,7 +116,7 @@ fn one_output_plan_preserves_scaled_dimensions() {
     let plan = build_composition_plan(&outputs).unwrap();
 
     assert_eq!((plan.width, plan.height), (200, 100));
-    assert!((plan.common_scale - 2.0).abs() <= SCALE_EPSILON);
+    assert_eq!(plan.common_scale, 2.0);
     assert_eq!(
         plan.placements,
         vec![PixelRect {
@@ -145,6 +182,46 @@ fn scaled_edges_share_the_same_boundary_without_seam_or_overlap() {
 }
 
 #[test]
+fn scaled_opaque_output_keeps_edge_pixels_opaque_and_color_correct() {
+    let outputs = [
+        captured_solid(0, 0, 5, 5, 5, 5, 0xffff_0000),
+        captured_solid(10, 0, 5, 5, 8, 8, 0xff00_00ff),
+    ];
+    let mut surface = compose_outputs(&outputs).unwrap();
+
+    for y in 0..8 {
+        for x in 0..8 {
+            assert_eq!(surface_pixel(&mut surface, x, y), 0xffff_0000);
+        }
+    }
+}
+
+#[test]
+fn touching_scaled_outputs_have_no_dark_or_transparent_boundary_seam() {
+    let outputs = [
+        captured_solid(0, 0, 5, 5, 5, 5, 0xffff_0000),
+        captured_solid(5, 0, 5, 5, 8, 8, 0xff00_00ff),
+    ];
+    let mut surface = compose_outputs(&outputs).unwrap();
+
+    for y in 0..8 {
+        assert_eq!(surface_pixel(&mut surface, 7, y), 0xffff_0000);
+        assert_eq!(surface_pixel(&mut surface, 8, y), 0xff00_00ff);
+    }
+}
+
+#[test]
+fn shm_backing_uses_anonymous_memfd() {
+    let file = create_shm_file(4096).unwrap();
+    let link = std::fs::read_link(format!("/proc/self/fd/{}", file.as_raw_fd())).unwrap();
+    assert!(
+        link.to_string_lossy().contains("memfd:hyprshot"),
+        "unexpected SHM backing: {}",
+        link.display()
+    );
+}
+
+#[test]
 fn composition_rejects_invalid_or_overflowing_bounds() {
     let invalid = [captured(0, 0, 0, 10, 1, 10)];
     assert!(build_composition_plan(&invalid).is_err());
@@ -173,19 +250,25 @@ fn composition_rejects_invalid_or_overflowing_bounds() {
 }
 
 #[test]
-fn effective_scale_supports_one_two_and_fractional_scale() {
-    assert!(
-        (effective_scale(&captured(0, 0, 100, 100, 100, 100)).unwrap() - 1.0).abs()
-            <= SCALE_EPSILON
+fn effective_scale_supports_exact_and_rounded_fractional_geometry() {
+    assert_eq!(
+        effective_scale(&captured(0, 0, 100, 100, 100, 100)).unwrap(),
+        1.0
     );
-    assert!(
-        (effective_scale(&captured(0, 0, 100, 100, 200, 200)).unwrap() - 2.0).abs()
-            <= SCALE_EPSILON
+    assert_eq!(
+        effective_scale(&captured(0, 0, 100, 100, 200, 200)).unwrap(),
+        2.0
     );
-    assert!(
-        (effective_scale(&captured(0, 0, 100, 80, 125, 100)).unwrap() - 1.25).abs()
-            <= SCALE_EPSILON
+    assert_eq!(
+        effective_scale(&captured(0, 0, 100, 80, 125, 100)).unwrap(),
+        1.25
     );
+
+    let rounded_125 = effective_scale(&captured(0, 0, 1093, 614, 1366, 768)).unwrap();
+    assert!((1.24..1.26).contains(&rounded_125));
+
+    let rounded_150 = effective_scale(&captured(0, 0, 1707, 1067, 2560, 1600)).unwrap();
+    assert!((1.49..1.51).contains(&rounded_150));
 }
 
 #[test]
@@ -196,7 +279,7 @@ fn mixed_scale_outputs_choose_highest_effective_scale() {
     ];
     let plan = build_composition_plan(&outputs).unwrap();
 
-    assert!((plan.common_scale - 2.0).abs() <= SCALE_EPSILON);
+    assert_eq!(plan.common_scale, 2.0);
     assert_eq!((plan.width, plan.height), (400, 200));
     assert_eq!(plan.placements[0].width, 200);
     assert_eq!(plan.placements[1].width, 200);
@@ -204,7 +287,7 @@ fn mixed_scale_outputs_choose_highest_effective_scale() {
 
 #[test]
 fn unequal_effective_xy_scale_is_rejected() {
-    let output = captured(0, 0, 100, 100, 125, 126);
+    let output = captured(0, 0, 100, 100, 125, 130);
     assert!(effective_scale(&output).is_err());
 }
 
