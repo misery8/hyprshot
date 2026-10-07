@@ -1,14 +1,10 @@
 use gdk4::Cursor;
-use gtk4::DrawingArea;
 use gtk4::prelude::WidgetExt;
+use gtk4::DrawingArea;
 
 use crate::modules::screenshot::state::{Rect, SelectionHitZone};
 
-pub fn update_cursor(
-    rect: &Rect,
-    mouse_pos: (i32, i32),
-    drawing_area: &DrawingArea
-) {
+pub fn update_cursor(rect: &Rect, mouse_pos: (i32, i32), drawing_area: &DrawingArea) {
     let zone = get_cursor_zone(rect, mouse_pos, Some(10));
     apply_cursor(drawing_area, &zone);
 }
@@ -28,8 +24,11 @@ pub fn apply_cursor(drawing_area: &DrawingArea, zone: &SelectionHitZone) {
     }
 }
 
-pub fn get_cursor_zone(rect: &Rect, mouse_pos: (i32, i32), margin: Option<i32>) -> SelectionHitZone {
-    
+pub fn get_cursor_zone(
+    rect: &Rect,
+    mouse_pos: (i32, i32),
+    margin: Option<i32>,
+) -> SelectionHitZone {
     if rect.is_empty() {
         return SelectionHitZone::Outside;
     }

@@ -5,7 +5,6 @@ use gdk_pixbuf::{Pixbuf, PixbufLoader};
 use gtk4::prelude::PixbufLoaderExt;
 
 pub fn capture_fullscreen() -> Result<Pixbuf> {
-    
     let output = Command::new("grim").arg("-").output()?;
 
     anyhow::ensure!(output.status.success(), "grim returned non-zero status");
@@ -20,3 +19,4 @@ pub fn capture_fullscreen() -> Result<Pixbuf> {
 
     Ok(pixbuf)
 }
+

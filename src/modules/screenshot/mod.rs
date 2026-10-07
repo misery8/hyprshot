@@ -21,24 +21,19 @@ pub fn run(app: &gtk4::Application) {
     let app_handle = app.clone();
     let mut state = ScreenshotState::default();
 
-    let canvas = Rc::new(
-        Canvas::from_screenshot()
-            .expect("Failed to create ")
-    );
+    let canvas = Rc::new(Canvas::from_screenshot().expect("Failed to create "));
 
     let screen_size = canvas.get_screen_size();
     state.set_screen_size(screen_size);
 
     let state = Rc::new(RefCell::new(state));
 
-    let widgets = Rc::new(
-        ScreenshotWidgets::build(
-            app,
-            tx.clone(),
-            state.clone(),
-            canvas.clone(),
-        )
-    );
+    let widgets = Rc::new(ScreenshotWidgets::build(
+        app,
+        tx.clone(),
+        state.clone(),
+        canvas.clone(),
+    ));
 
     crate::modules::screenshot::events::init_events(tx, &widgets);
 
@@ -89,7 +84,9 @@ fn handle_action(
                             &widgets.drawing_area,
                         );
                         if s.is_paused() {
-                            widgets.toolbar.update_position(&s.selection().rect(), s.screen_size());
+                            widgets
+                                .toolbar
+                                .update_position(&s.selection().rect(), s.screen_size());
                         }
                     }
                 }
@@ -98,10 +95,12 @@ fn handle_action(
                         canvas.apply_shape(&shape);
                     }
                     s.begin_drag(x, y);
-                },
+                }
                 ScreenshotAction::DragUpdate(x, y) => {
                     s.update_drag(x, y);
-                    widgets.toolbar.update_position(&s.selection().rect(), s.screen_size());
+                    widgets
+                        .toolbar
+                        .update_position(&s.selection().rect(), s.screen_size());
                 }
                 ScreenshotAction::DragEnd => {
                     if let Some(shape) = s.current_shape() {
@@ -110,7 +109,8 @@ fn handle_action(
                     s.end_drag();
 
                     if !s.is_paused() {
-                        let buf = s.export_selection(&canvas.surface.borrow())
+                        let buf = s
+                            .export_selection(&canvas.surface.borrow())
                             .expect("Failed export");
                         let _ = clipboard::copy_to_clipboard(&buf);
 
@@ -129,14 +129,14 @@ fn handle_action(
                         canvas.apply_shape(&shape);
                     }
 
-                    let buf = s.export_selection(&canvas.surface.borrow())
+                    let buf = s
+                        .export_selection(&canvas.surface.borrow())
                         .expect("Failed export");
                     let _ = clipboard::copy_to_clipboard(&buf);
                     app.quit();
                 }
 
-                ScreenshotAction::Undo => { canvas.restore_snapshot() }
-
+                ScreenshotAction::Undo => canvas.restore_snapshot(),
             }
             need_redraw = true;
         }

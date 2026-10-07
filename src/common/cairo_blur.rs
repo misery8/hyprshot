@@ -1,4 +1,4 @@
-use anyhow::{Ok, Error, bail};
+use anyhow::{bail, Error, Ok};
 use cairo::{Format, ImageSurface};
 
 struct ARgb {
@@ -58,14 +58,18 @@ fn apply_blur_in_place(surface: &mut ImageSurface, radius: i32) -> Result<(), Er
     let width = surface.width() as usize;
     let height = surface.height() as usize;
 
-    if width == 0 || height == 0 { return Ok(()); }
+    if width == 0 || height == 0 {
+        return Ok(());
+    }
 
     let stride = surface.stride() as usize;
 
     let (kernel, kernel_sum) = generate_gaussian_kernel(radius)?;
 
     {
-        let mut data = surface.data().map_err(|e| anyhow::anyhow!("Cairo error: {:?}", e))?;
+        let mut data = surface
+            .data()
+            .map_err(|e| anyhow::anyhow!("Cairo error: {:?}", e))?;
         let stride_pixels = (stride / 4) as usize;
 
         let pixels = unsafe {
@@ -85,12 +89,18 @@ fn apply_blur_in_place(surface: &mut ImageSurface, radius: i32) -> Result<(), Er
                     let src_x = (x as i32 + (k as i32 - half)).clamp(0, width as i32 - 1) as usize;
                     let p = ARgb::from_u32(pixels[row_offset + src_x]);
                     let w = kernel[k];
-                    acc.0 += p.a * w; acc.1 += p.r * w; acc.2 += p.g * w; acc.3 += p.b * w;
+                    acc.0 += p.a * w;
+                    acc.1 += p.r * w;
+                    acc.2 += p.g * w;
+                    acc.3 += p.b * w;
                 }
                 temp_vec[y * width + x] = ARgb {
-                    a: acc.0 / kernel_sum, r: acc.1 / kernel_sum,
-                    g: acc.2 / kernel_sum, b: acc.3 / kernel_sum
-                }.to_u32();
+                    a: acc.0 / kernel_sum,
+                    r: acc.1 / kernel_sum,
+                    g: acc.2 / kernel_sum,
+                    b: acc.3 / kernel_sum,
+                }
+                .to_u32();
             }
         }
 
@@ -102,12 +112,18 @@ fn apply_blur_in_place(surface: &mut ImageSurface, radius: i32) -> Result<(), Er
                     let src_y = (y as i32 + (k as i32 - half)).clamp(0, height as i32 - 1) as usize;
                     let p = ARgb::from_u32(temp_vec[src_y * width + x]);
                     let w = kernel[k];
-                    acc.0 += p.a * w; acc.1 += p.r * w; acc.2 += p.g * w; acc.3 += p.b * w;
+                    acc.0 += p.a * w;
+                    acc.1 += p.r * w;
+                    acc.2 += p.g * w;
+                    acc.3 += p.b * w;
                 }
                 pixels[y * stride_pixels + x] = ARgb {
-                    a: acc.0 / kernel_sum, r: acc.1 / kernel_sum,
-                    g: acc.2 / kernel_sum, b: acc.3 / kernel_sum,
-                }.to_u32();
+                    a: acc.0 / kernel_sum,
+                    r: acc.1 / kernel_sum,
+                    g: acc.2 / kernel_sum,
+                    b: acc.3 / kernel_sum,
+                }
+                .to_u32();
             }
         }
     }
@@ -116,7 +132,13 @@ fn apply_blur_in_place(surface: &mut ImageSurface, radius: i32) -> Result<(), Er
     Ok(())
 }
 
-fn copy_region(source: &ImageSurface, x: f64, y: f64, w: i32, h: i32) -> Result<ImageSurface, Error> {
+fn copy_region(
+    source: &ImageSurface,
+    x: f64,
+    y: f64,
+    w: i32,
+    h: i32,
+) -> Result<ImageSurface, Error> {
     let surface = ImageSurface::create(Format::ARgb32, w, h)
         .map_err(|e| anyhow::anyhow!("Failed to create surface: {:?}", e))?;
     let cr = cairo::Context::new(&surface)?;
@@ -141,6 +163,9 @@ fn generate_gaussian_kernel(radius: i32) -> Result<([u32; 17], u32), Error> {
     }
 
     #[allow(unreachable_code)]
-    if sum == 0 { return bail!("Kernel sum is zero"); }
+    if sum == 0 {
+        return bail!("Kernel sum is zero");
+    }
     Ok((kernel, sum))
 }
+
