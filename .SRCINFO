@@ -1,6 +1,6 @@
 pkgbase = hyprshot
 	pkgdesc = Lightweight screenshot and annotation tool for Hyprland (Rust version)
-	pkgver = 0.3.0.alpha
+	pkgver = 0.4.0
 	pkgrel = 1
 	url = https://github.com/misery8/hyprshot
 	arch = x86_64
@@ -11,11 +11,8 @@ pkgbase = hyprshot
 	depends = gdk-pixbuf2
 	depends = glib2
 	depends = cairo
-	depends = grim
 	depends = gtk4-layer-shell
-	provides = hyprshot
-	conflicts = hyprshot
-	source = hyprshot::git+https://github.com/misery8/hyprshot.git
+	source = hyprshot-0.4.0::git+https://github.com/misery8/hyprshot.git#tag=v0.4.0
 	sha256sums = SKIP
 
 pkgname = hyprshot
