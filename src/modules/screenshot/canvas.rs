@@ -318,6 +318,46 @@ mod tests {
     }
 
     #[test]
+    fn overflowing_arrow_does_not_modify_pixels_outside_selection() {
+        let canvas = test_canvas(100, 100);
+        let before = surface_png(&canvas);
+        let selection = Rect { x: 20, y: 20, w: 40, h: 40 };
+        let shape = Shape::Arrow {
+            from: (30, 30),
+            to: (90, 90),
+            color: (0, 0, 0),
+        };
+
+        canvas.apply_shape(&shape, &selection);
+        let after = surface_png(&canvas);
+        assert_ne!(after, before);
+
+        {
+            let current = canvas.surface.borrow_mut();
+            let original = ImageSurface::create(cairo::Format::ARgb32, 100, 100).unwrap();
+            let cr = Context::new(&original).unwrap();
+            cr.set_source_rgb(1.0, 1.0, 1.0);
+            cr.paint().unwrap();
+
+            let cr = Context::new(&*current).unwrap();
+            cr.save().unwrap();
+            cr.rectangle(
+                selection.x as f64,
+                selection.y as f64,
+                selection.w as f64,
+                selection.h as f64,
+            );
+            cr.clip();
+            cr.set_operator(cairo::Operator::Source);
+            cr.set_source_surface(&original, 0.0, 0.0).unwrap();
+            cr.paint().unwrap();
+            cr.restore().unwrap();
+        }
+
+        assert_eq!(surface_png(&canvas), before);
+    }
+
+    #[test]
     fn text_shape_uses_regional_undo_snapshot() {
         let canvas = test_canvas(200, 100);
 

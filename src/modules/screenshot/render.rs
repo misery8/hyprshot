@@ -2,8 +2,10 @@ use cairo::{Context, ImageSurface};
 
 use crate::modules::screenshot::state::{Rect, Shape, TextRun};
 
-const ARROW_LINE_WIDTH: f64 = 2.75;
-const RECTANGLE_LINE_WIDTH: f64 = 2.25;
+pub(crate) const ARROW_LINE_WIDTH: f64 = 2.75;
+pub(crate) const RECTANGLE_LINE_WIDTH: f64 = 2.25;
+pub(crate) const ARROW_HEAD_LENGTH: f64 = 16.0;
+pub(crate) const ARROW_HEAD_ANGLE: f64 = std::f64::consts::PI / 6.0;
 const TEXT_FONT_SIZE: f64 = 22.0;
 const TEXT_BOUNDS_PADDING: i32 = 4;
 const CARET_OUTLINE_WIDTH: f64 = 3.5;
@@ -12,6 +14,36 @@ const SELECTION_DIM_ALPHA: f64 = 0.6;
 const SELECTION_LINE_WIDTH: f64 = 1.5;
 const SELECTION_DASH: [f64; 2] = [6.0, 6.0];
 const SELECTION_HANDLE_SIZE: f64 = 8.0;
+
+pub(crate) fn stroke_padding(line_width: f64) -> i32 {
+    (line_width / 2.0).ceil() as i32
+}
+
+pub(crate) fn arrow_head_offsets(angle: f64) -> [(f64, f64); 2] {
+    [
+        (
+            -ARROW_HEAD_LENGTH * (angle - ARROW_HEAD_ANGLE).cos(),
+            -ARROW_HEAD_LENGTH * (angle - ARROW_HEAD_ANGLE).sin(),
+        ),
+        (
+            -ARROW_HEAD_LENGTH * (angle + ARROW_HEAD_ANGLE).cos(),
+            -ARROW_HEAD_LENGTH * (angle + ARROW_HEAD_ANGLE).sin(),
+        ),
+    ]
+}
+
+pub(crate) fn arrow_head_points(
+    from: (i32, i32),
+    to: (i32, i32),
+) -> [(f64, f64); 2] {
+    let angle = ((to.1 - from.1) as f64).atan2((to.0 - from.0) as f64);
+    let offsets = arrow_head_offsets(angle);
+
+    [
+        (to.0 as f64 + offsets[0].0, to.1 as f64 + offsets[0].1),
+        (to.0 as f64 + offsets[1].0, to.1 as f64 + offsets[1].1),
+    ]
+}
 
 fn set_color(cr: &Context, color: (u8, u8, u8), alpha: f64) {
     cr.set_source_rgba(
@@ -122,20 +154,12 @@ pub fn draw_arrow(
     cr.line_to(x2, y2);
     cr.stroke().expect("Cairo stroke failed");
 
-    let angle = (y2 - y1).atan2(x2 - x1);
-    let arrow_len = 16.0;
-    let arrow_angle = std::f64::consts::PI / 6.0;
+    let [head_a, head_b] = arrow_head_points(from, to);
 
     cr.move_to(x2, y2);
-    cr.line_to(
-        x2 - arrow_len * (angle - arrow_angle).cos(),
-        y2 - arrow_len * (angle - arrow_angle).sin(),
-    );
+    cr.line_to(head_a.0, head_a.1);
     cr.move_to(x2, y2);
-    cr.line_to(
-        x2 - arrow_len * (angle + arrow_angle).cos(),
-        y2 - arrow_len * (angle + arrow_angle).sin(),
-    );
+    cr.line_to(head_b.0, head_b.1);
     cr.stroke().expect("Cairo stroke failed");
 }
 

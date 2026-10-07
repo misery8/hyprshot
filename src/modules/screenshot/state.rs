@@ -119,8 +119,7 @@ impl ScreenshotState {
         let current = (start_x + dx, start_y + dy);
 
         if self.current_tool != Tool::None {
-            let constrained = self.selection.rect.clamp_point(current);
-            self.current_shape = self.get_current_shape(constrained);
+            self.current_shape = self.get_current_shape(current);
             self.mouse_pos = current;
             return;
         }
@@ -237,20 +236,166 @@ impl ScreenshotState {
         let from = self.drag_start?;
 
         match self.current_tool {
-            Tool::Arrow => Some(Shape::Arrow {
-                from,
-                to,
-                color: self.current_color,
-            }),
-            Tool::Rectangle => Some(Shape::Rectangle {
-                rect: Self::rect_from_points(from, to),
-                color: self.current_color,
-            }),
-            Tool::Blur => Some(Shape::Blur {
-                rect: Self::rect_from_points(from, to),
-            }),
+            Tool::Arrow => self.constrained_arrow(from, to),
+            Tool::Rectangle => {
+                let safe = self.selection.rect.inset(
+                    render::stroke_padding(render::RECTANGLE_LINE_WIDTH)
+                )?;
+                let from = safe.clamp_point(from);
+                let to = safe.clamp_point(to);
+
+                Some(Shape::Rectangle {
+                    rect: Self::rect_from_points(from, to),
+                    color: self.current_color,
+                })
+            }
+            Tool::Blur => {
+                let to = self.selection.rect.clamp_point(to);
+                Some(Shape::Blur {
+                    rect: Self::rect_from_points(from, to),
+                })
+            }
             Tool::Text | Tool::None => None,
         }
+    }
+
+    fn constrained_arrow(
+        &self,
+        raw_from: (i32, i32),
+        raw_to: (i32, i32),
+    ) -> Option<Shape> {
+        let safe = self.selection.rect.inset(
+            render::stroke_padding(render::ARROW_LINE_WIDTH)
+        )?;
+        let from = safe.clamp_point(raw_from);
+
+        let raw_dx = (raw_to.0 - raw_from.0) as f64;
+        let raw_dy = (raw_to.1 - raw_from.1) as f64;
+        let raw_length = raw_dx.hypot(raw_dy);
+        if raw_length <= f64::EPSILON {
+            return None;
+        }
+
+        let direction = (raw_dx / raw_length, raw_dy / raw_length);
+        let angle = raw_dy.atan2(raw_dx);
+        let offsets = render::arrow_head_offsets(angle);
+        let tip_bounds = Self::admissible_tip_bounds(&safe, offsets)?;
+        let (entry, exit) = Self::ray_box_interval(from, direction, tip_bounds)?;
+
+        let mut distance = raw_length.min(exit);
+        if distance + 1e-9 < entry {
+            return None;
+        }
+
+        // Rounding the ray point to integer canvas coordinates can slightly
+        // rotate the final segment. Re-check the exact renderer geometry and
+        // retreat inward along the same intended ray when necessary.
+        for _ in 0..=64 {
+            if distance + 1e-9 < entry {
+                break;
+            }
+
+            let to = (
+                (from.0 as f64 + direction.0 * distance).round() as i32,
+                (from.1 as f64 + direction.1 * distance).round() as i32,
+            );
+
+            if to != from && Self::arrow_geometry_fits(from, to, &safe) {
+                return Some(Shape::Arrow {
+                    from,
+                    to,
+                    color: self.current_color,
+                });
+            }
+
+            let next = (distance - 0.25).max(entry);
+            if (next - distance).abs() <= f64::EPSILON {
+                break;
+            }
+            distance = next;
+        }
+
+        None
+    }
+
+    fn admissible_tip_bounds(
+        safe: &Rect,
+        head_offsets: [(f64, f64); 2],
+    ) -> Option<(f64, f64, f64, f64)> {
+        let offsets = [(0.0, 0.0), head_offsets[0], head_offsets[1]];
+        let mut min_x = safe.x as f64;
+        let mut max_x = safe.right() as f64;
+        let mut min_y = safe.y as f64;
+        let mut max_y = safe.bottom() as f64;
+
+        for (offset_x, offset_y) in offsets {
+            min_x = min_x.max(safe.x as f64 - offset_x);
+            max_x = max_x.min(safe.right() as f64 - offset_x);
+            min_y = min_y.max(safe.y as f64 - offset_y);
+            max_y = max_y.min(safe.bottom() as f64 - offset_y);
+        }
+
+        if min_x > max_x || min_y > max_y {
+            return None;
+        }
+
+        Some((min_x, max_x, min_y, max_y))
+    }
+
+    fn ray_box_interval(
+        origin: (i32, i32),
+        direction: (f64, f64),
+        bounds: (f64, f64, f64, f64),
+    ) -> Option<(f64, f64)> {
+        let (min_x, max_x, min_y, max_y) = bounds;
+        let mut entry: f64 = 0.0;
+        let mut exit = f64::INFINITY;
+
+        for (origin, direction, min, max) in [
+            (origin.0 as f64, direction.0, min_x, max_x),
+            (origin.1 as f64, direction.1, min_y, max_y),
+        ] {
+            if direction.abs() <= f64::EPSILON {
+                if origin < min || origin > max {
+                    return None;
+                }
+                continue;
+            }
+
+            let mut near = (min - origin) / direction;
+            let mut far = (max - origin) / direction;
+            if near > far {
+                std::mem::swap(&mut near, &mut far);
+            }
+
+            entry = entry.max(near);
+            exit = exit.min(far);
+            if entry > exit {
+                return None;
+            }
+        }
+
+        if exit < 0.0 {
+            return None;
+        }
+
+        Some((entry.max(0.0), exit))
+    }
+
+    fn arrow_geometry_fits(
+        from: (i32, i32),
+        to: (i32, i32),
+        safe: &Rect,
+    ) -> bool {
+        if !safe.contains_closed((from.0 as f64, from.1 as f64))
+            || !safe.contains_closed((to.0 as f64, to.1 as f64))
+        {
+            return false;
+        }
+
+        render::arrow_head_points(from, to)
+            .into_iter()
+            .all(|point| safe.contains_closed(point))
     }
 
     fn rect_from_points(from: (i32, i32), to: (i32, i32)) -> Rect {
@@ -396,6 +541,27 @@ impl Rect {
             x.clamp(self.x, self.right()),
             y.clamp(self.y, self.bottom()),
         )
+    }
+
+    fn contains_closed(&self, (x, y): (f64, f64)) -> bool {
+        x >= self.x as f64
+            && x <= self.right() as f64
+            && y >= self.y as f64
+            && y <= self.bottom() as f64
+    }
+
+    fn inset(&self, padding: i32) -> Option<Self> {
+        let padding = padding.max(0);
+        if self.w < padding * 2 || self.h < padding * 2 {
+            return None;
+        }
+
+        Some(Self {
+            x: self.x + padding,
+            y: self.y + padding,
+            w: self.w - padding * 2,
+            h: self.h - padding * 2,
+        })
     }
 
     fn right(&self) -> i32 {
@@ -632,41 +798,109 @@ mod tests {
         assert_eq!(*state.selection().rect(), Rect { x: 20, y: 30, w: 180, h: 150 });
     }
 
-    #[test]
-    fn arrow_drag_stops_at_selection_boundary() {
-        let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
-        let mut state = paused_state_with_rect(rect, (200, 200));
-        let _ = state.set_tool(Tool::Arrow);
-        state.begin_drag(40, 50);
+    fn rendered_shape_png(shape: &Shape, clip: Option<&Rect>) -> Vec<u8> {
+        let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 200, 160).unwrap();
+        let cr = cairo::Context::new(&surface).unwrap();
+        cr.set_source_rgb(1.0, 1.0, 1.0);
+        cr.paint().unwrap();
 
-        state.update_drag(500, 500);
+        if let Some(clip) = clip {
+            render::draw_shape_clipped(&surface, &cr, shape, clip);
+        } else {
+            render::draw_shape(&surface, &cr, shape);
+        }
 
+        let mut bytes = Vec::new();
+        surface.write_to_png(&mut bytes).unwrap();
+        bytes
+    }
+
+    fn assert_render_fits_selection(shape: &Shape, selection: &Rect) {
         assert_eq!(
-            state.current_shape(),
-            Some(&Shape::Arrow {
-                from: (40, 50),
-                to: (140, 110),
-                color: (255, 0, 0),
-            })
+            rendered_shape_png(shape, None),
+            rendered_shape_png(shape, Some(selection)),
         );
     }
 
     #[test]
-    fn rectangle_drag_stops_at_selection_boundary() {
+    fn arrow_drag_toward_each_edge_is_fully_rendered_inside_selection() {
+        let rect = Rect { x: 20, y: 20, w: 120, h: 100 };
+        let start = (80, 70);
+
+        for target in [(80, -100), (80, 300), (-100, 70), (300, 70)] {
+            let mut state = paused_state_with_rect(rect, (200, 160));
+            let _ = state.set_tool(Tool::Arrow);
+            state.begin_drag(start.0, start.1);
+            state.update_drag(target.0 - start.0, target.1 - start.1);
+
+            let shape = state.current_shape().expect("contained arrow should exist");
+            assert_render_fits_selection(shape, &rect);
+        }
+    }
+
+    #[test]
+    fn diagonal_arrow_drag_preserves_direction_and_rendered_bounds() {
+        let rect = Rect { x: 20, y: 20, w: 120, h: 100 };
+        let start = (80, 70);
+
+        for target in [
+            (-100, -100),
+            (300, -100),
+            (-100, 300),
+            (300, 300),
+        ] {
+            let mut state = paused_state_with_rect(rect, (200, 160));
+            let _ = state.set_tool(Tool::Arrow);
+            state.begin_drag(start.0, start.1);
+            state.update_drag(target.0 - start.0, target.1 - start.1);
+
+            let shape = state.current_shape().expect("contained arrow should exist");
+            assert_render_fits_selection(shape, &rect);
+
+            let Shape::Arrow { from, to, .. } = shape else {
+                panic!("expected arrow");
+            };
+            let raw = ((target.0 - start.0) as f64, (target.1 - start.1) as f64);
+            let actual = ((to.0 - from.0) as f64, (to.1 - from.1) as f64);
+            let raw_len = raw.0.hypot(raw.1);
+            let actual_len = actual.0.hypot(actual.1);
+            let cross = (raw.0 * actual.1 - raw.1 * actual.0).abs();
+            let dot = raw.0 * actual.0 + raw.1 * actual.1;
+
+            assert!(dot > 0.0, "arrow reversed direction");
+            assert!(
+                cross / (raw_len * actual_len) <= 0.03,
+                "arrow direction changed beyond integer-rounding tolerance"
+            );
+        }
+    }
+
+    #[test]
+    fn rectangle_drag_toward_each_edge_is_fully_rendered_inside_selection() {
+        let rect = Rect { x: 20, y: 20, w: 120, h: 100 };
+        let start = (80, 70);
+
+        for target in [(110, -100), (110, 300), (-100, 90), (300, 90)] {
+            let mut state = paused_state_with_rect(rect, (200, 160));
+            let _ = state.set_tool(Tool::Rectangle);
+            state.begin_drag(start.0, start.1);
+            state.update_drag(target.0 - start.0, target.1 - start.1);
+
+            let shape = state.current_shape().expect("contained rectangle should exist");
+            assert_render_fits_selection(shape, &rect);
+        }
+    }
+
+    #[test]
+    fn annotation_drag_cannot_start_outside_selection() {
         let rect = Rect { x: 20, y: 30, w: 120, h: 80 };
         let mut state = paused_state_with_rect(rect, (200, 200));
-        let _ = state.set_tool(Tool::Rectangle);
-        state.begin_drag(40, 50);
+        let _ = state.set_tool(Tool::Arrow);
 
-        state.update_drag(500, 500);
+        state.begin_drag(10, 10);
+        state.update_drag(100, 100);
 
-        assert_eq!(
-            state.current_shape(),
-            Some(&Shape::Rectangle {
-                rect: Rect { x: 40, y: 50, w: 100, h: 60 },
-                color: (255, 0, 0),
-            })
-        );
+        assert!(state.current_shape().is_none());
     }
 
     #[test]
