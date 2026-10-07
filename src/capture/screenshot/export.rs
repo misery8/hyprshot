@@ -18,4 +18,3 @@ pub fn export_selection(
     cropped.write_to_png(&mut buf)?;
     Ok(buf)
 }
-

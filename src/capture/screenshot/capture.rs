@@ -19,4 +19,3 @@ pub fn capture_fullscreen() -> Result<Pixbuf> {
 
     Ok(pixbuf)
 }
-

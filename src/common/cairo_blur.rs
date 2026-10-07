@@ -168,4 +168,3 @@ fn generate_gaussian_kernel(radius: i32) -> Result<([u32; 17], u32), Error> {
     }
     Ok((kernel, sum))
 }
-

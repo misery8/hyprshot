@@ -28,4 +28,3 @@ pub fn copy_to_clipboard(png_data: &[u8]) -> Result<()> {
 
     Ok(())
 }
-
