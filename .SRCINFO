@@ -8,7 +8,6 @@ pkgbase = hyprshot
 	makedepends = cargo
 	makedepends = git
 	depends = gtk4
-	depends = gdk-pixbuf2
 	depends = glib2
 	depends = cairo
 	depends = gtk4-layer-shell

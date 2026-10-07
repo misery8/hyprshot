@@ -5,7 +5,7 @@ pkgdesc="Lightweight screenshot and annotation tool for Hyprland (Rust version)"
 arch=('x86_64')
 url="https://github.com/misery8/${pkgname}"
 license=('GPL3')
-depends=('gtk4' 'gdk-pixbuf2' 'glib2' 'cairo' 'gtk4-layer-shell')
+depends=('gtk4' 'glib2' 'cairo' 'gtk4-layer-shell')
 makedepends=('cargo' 'git')
 source=("${pkgname}-${pkgver}::git+${url}.git#tag=v${pkgver}")
 sha256sums=('SKIP')
