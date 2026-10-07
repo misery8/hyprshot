@@ -777,6 +777,28 @@ mod tests {
     }
 
     #[test]
+    fn create_drag_becomes_non_empty_after_first_delta() {
+        let mut state = ScreenshotState::default();
+        state.set_screen_size((200, 200));
+
+        state.begin_drag(50, 60);
+        assert!(state.selection().rect().is_empty());
+
+        state.update_drag(5, 7);
+
+        assert_eq!(
+            *state.selection().rect(),
+            Rect {
+                x: 50,
+                y: 60,
+                w: 5,
+                h: 7
+            }
+        );
+        assert!(!state.selection().rect().is_empty());
+    }
+
+    #[test]
     fn create_drag_clamps_current_point_at_top_left() {
         let mut state = ScreenshotState::default();
         state.set_screen_size((200, 200));

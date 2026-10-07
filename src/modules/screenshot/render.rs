@@ -87,6 +87,11 @@ pub fn draw_selection(cr: &Context, rect: &Rect, viewport: (f64, f64)) {
     cr.set_fill_rule(cairo::FillRule::EvenOdd);
     cr.fill().expect("Cairo selection overlay fill failed");
 
+    if rect.is_empty() {
+        cr.restore().expect("Failed to restore selection context");
+        return;
+    }
+
     cr.set_source_rgba(1.0, 1.0, 1.0, 1.0);
     cr.set_line_width(SELECTION_LINE_WIDTH);
     cr.set_dash(&SELECTION_DASH, 0.0);
@@ -388,6 +393,71 @@ mod tests {
                 h: bottom - top,
             })
         );
+    }
+
+    fn test_surface(width: i32, height: i32) -> ImageSurface {
+        let surface = ImageSurface::create(cairo::Format::ARgb32, width, height).unwrap();
+        let cr = Context::new(&surface).unwrap();
+        cr.set_source_rgb(1.0, 1.0, 1.0);
+        cr.paint().unwrap();
+        surface
+    }
+
+    fn surface_png(surface: &ImageSurface) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        surface.write_to_png(&mut bytes).unwrap();
+        bytes
+    }
+
+    fn draw_dim_only(cr: &Context, rect: &Rect, viewport: (f64, f64)) {
+        let (x, y, w, h) = rect.as_f64();
+
+        cr.save().unwrap();
+        cr.set_operator(cairo::Operator::Over);
+        cr.set_source_rgba(0.0, 0.0, 0.0, SELECTION_DIM_ALPHA);
+        cr.rectangle(0.0, 0.0, viewport.0, viewport.1);
+        cr.rectangle(x, y, w, h);
+        cr.set_fill_rule(cairo::FillRule::EvenOdd);
+        cr.fill().unwrap();
+        cr.restore().unwrap();
+    }
+
+    #[test]
+    fn zero_size_selection_renders_dim_only() {
+        let rect = Rect::zero();
+        let viewport = (80.0, 60.0);
+
+        let actual = test_surface(80, 60);
+        let actual_cr = Context::new(&actual).unwrap();
+        draw_selection(&actual_cr, &rect, viewport);
+
+        let expected = test_surface(80, 60);
+        let expected_cr = Context::new(&expected).unwrap();
+        draw_dim_only(&expected_cr, &rect, viewport);
+
+        assert_eq!(surface_png(&actual), surface_png(&expected));
+    }
+
+    #[test]
+    fn non_empty_selection_adds_selection_chrome() {
+        let rect = Rect {
+            x: 10,
+            y: 12,
+            w: 40,
+            h: 30,
+        };
+        let viewport = (80.0, 60.0);
+
+        let actual = test_surface(80, 60);
+        let actual_cr = Context::new(&actual).unwrap();
+        draw_selection(&actual_cr, &rect, viewport);
+
+        let dim_only = test_surface(80, 60);
+        let dim_only_cr = Context::new(&dim_only).unwrap();
+        draw_dim_only(&dim_only_cr, &rect, viewport);
+
+        assert_ne!(surface_png(&actual), surface_png(&dim_only));
+        assert_eq!(selection_handle_positions(&rect).len(), 8);
     }
 
     #[test]
