@@ -5,7 +5,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use gtk4::{Application, ApplicationWindow, DrawingArea, Overlay};
 use gtk4::prelude::*;
 use gtk4_layer_shell::LayerShell;
 
@@ -24,7 +23,7 @@ pub struct ScreenshotWidgets {
 }
 
 impl ScreenshotWidgets {
-    pub fn build (
+    pub fn build(
         app: &Application,
         tx: Sender<AppAction>,
         state: Rc<RefCell<ScreenshotState>>,
@@ -44,7 +43,7 @@ impl ScreenshotWidgets {
             .build();
 
         Self::setup_render_loop(&drawing_area, state, canvas);
-        
+
         let toolbar = Toolbar::new(tx);
         let overlay = Self::setup_layout(&drawing_area, toolbar.widget());
 
@@ -54,7 +53,7 @@ impl ScreenshotWidgets {
             .title("Hyprshot")
             .decorated(false)
             .build();
-        
+
         window.init_layer_shell();
         window.set_layer(gtk4_layer_shell::Layer::Overlay);
         window.set_exclusive_zone(-1);
@@ -67,7 +66,11 @@ impl ScreenshotWidgets {
 
         window.present();
 
-        Self { window, drawing_area, toolbar }
+        Self {
+            window,
+            drawing_area,
+            toolbar,
+        }
     }
 
     fn setup_layout(da: &DrawingArea, toolbar_widget: &gtk4::Box) -> Overlay {
@@ -127,7 +130,7 @@ impl ScreenshotWidgets {
         da.set_draw_func(move |area, cr, _, _| {
             let state = state.borrow();
             let surface = canvas.surface.borrow();
-            
+
             cr.set_source_surface(&*surface, 0.0, 0.0).unwrap();
             cr.paint().unwrap();
 
@@ -157,13 +160,9 @@ impl ScreenshotWidgets {
                 cr.rectangle(x, y, w, h);
                 cr.clip();
 
-                render::draw_text_preview(
-                    cr,
-                    input.position(),
-                    input.runs(),
-                    caret_visible.get(),
-                );
-                cr.restore().expect("Failed to restore text preview context");
+                render::draw_text_preview(cr, input.position(), input.runs(), caret_visible.get());
+                cr.restore()
+                    .expect("Failed to restore text preview context");
             }
         });
     }

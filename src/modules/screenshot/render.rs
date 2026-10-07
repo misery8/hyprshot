@@ -78,11 +78,7 @@ fn selection_handle_positions(rect: &Rect) -> [(f64, f64); 8] {
     ]
 }
 
-pub fn draw_selection(
-    cr: &Context,
-    rect: &Rect,
-    viewport: (f64, f64),
-) {
+pub fn draw_selection(cr: &Context, rect: &Rect, viewport: (f64, f64)) {
     let (x, y, w, h) = rect.as_f64();
 
     cr.save().expect("Failed to save selection context");
@@ -138,12 +134,7 @@ pub fn draw_shape_clipped(
     cr.restore().expect("Failed to restore annotation clip context");
 }
 
-pub fn draw_arrow(
-    cr: &Context,
-    from: (i32, i32),
-    to: (i32, i32),
-    color: (u8, u8, u8),
-) {
+pub fn draw_arrow(cr: &Context, from: (i32, i32), to: (i32, i32), color: (u8, u8, u8)) {
     let (x1, y1) = (from.0 as f64, from.1 as f64);
     let (x2, y2) = (to.0 as f64, to.1 as f64);
 
@@ -163,11 +154,7 @@ pub fn draw_arrow(
     cr.stroke().expect("Cairo stroke failed");
 }
 
-pub fn draw_rectangle(
-    cr: &Context,
-    rect: &Rect,
-    color: (u8, u8, u8)
-) {
+pub fn draw_rectangle(cr: &Context, rect: &Rect, color: (u8, u8, u8)) {
     let (x, y, w, h) = rect.as_f64();
 
     set_color(cr, color, 1.0);
@@ -177,11 +164,7 @@ pub fn draw_rectangle(
     cr.stroke().expect("Cairo stroke failed");
 }
 
-pub fn draw_text(
-    cr: &Context,
-    position: (i32, i32),
-    runs: &[TextRun],
-) {
+pub fn draw_text(cr: &Context, position: (i32, i32), runs: &[TextRun]) {
     if runs.is_empty() {
         return;
     }
@@ -195,7 +178,8 @@ pub fn draw_text(
             continue;
         }
 
-        let advance = cr.text_extents(run.text())
+        let advance = cr
+            .text_extents(run.text())
             .map(|extents| extents.x_advance())
             .unwrap_or(0.0);
 
@@ -279,23 +263,22 @@ pub fn text_bounds(cr: &Context, position: (i32, i32), runs: &[TextRun]) -> Opti
 pub fn draw_blur(surface: &ImageSurface, cr: &Context, rect: &Rect) {
     let (x, y, w, h) = rect.as_f64();
 
-    let blurred_region = match crate::common::cairo_blur::blur_image_surface(
-        surface, x, y, rect.w, rect.h, 10
-    ) {
-        Ok(s) => s,
-        Err(_) => return,
-    };
+    let blurred_region =
+        match crate::common::cairo_blur::blur_image_surface(surface, x, y, rect.w, rect.h, 10) {
+            Ok(s) => s,
+            Err(_) => return,
+        };
 
     cr.save().expect("Failed to save state");
     cr.rectangle(x, y, w, h);
     cr.clip();
 
-    cr.set_source_surface(&blurred_region, x, y).expect("Failed to set source");
+    cr.set_source_surface(&blurred_region, x, y)
+        .expect("Failed to set source");
     cr.paint().expect("Failed to paint");
 
     cr.restore().expect("Failed to restore state");
 }
-
 
 #[cfg(test)]
 mod tests {
