@@ -108,7 +108,7 @@ impl Canvas {
         }
 
         let cr = Context::new(&*surface).expect("Failed to create bake context");
-        render::draw_shape(&*surface, &cr, shape);
+        render::draw_shape(&surface, &cr, shape);
     }
 
     fn clone_region(surface: &ImageSurface, rect: Rect) -> Result<ImageSurface, Error> {

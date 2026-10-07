@@ -70,7 +70,7 @@ fn apply_blur_in_place(surface: &mut ImageSurface, radius: i32) -> Result<(), Er
         let mut data = surface
             .data()
             .map_err(|e| anyhow::anyhow!("Cairo error: {:?}", e))?;
-        let stride_pixels = (stride / 4) as usize;
+        let stride_pixels = stride / 4;
 
         let pixels = unsafe {
             std::slice::from_raw_parts_mut(data.as_mut_ptr() as *mut u32, stride_pixels * height)
@@ -85,10 +85,9 @@ fn apply_blur_in_place(surface: &mut ImageSurface, radius: i32) -> Result<(), Er
             let row_offset = y * stride_pixels;
             for x in 0..width {
                 let mut acc = (0, 0, 0, 0);
-                for k in 0..kernel_size {
+                for (k, &w) in kernel.iter().enumerate().take(kernel_size) {
                     let src_x = (x as i32 + (k as i32 - half)).clamp(0, width as i32 - 1) as usize;
                     let p = ARgb::from_u32(pixels[row_offset + src_x]);
-                    let w = kernel[k];
                     acc.0 += p.a * w;
                     acc.1 += p.r * w;
                     acc.2 += p.g * w;
@@ -108,10 +107,9 @@ fn apply_blur_in_place(surface: &mut ImageSurface, radius: i32) -> Result<(), Er
         for x in 0..width {
             for y in 0..height {
                 let mut acc = (0, 0, 0, 0);
-                for k in 0..kernel_size {
+                for (k, &w) in kernel.iter().enumerate().take(kernel_size) {
                     let src_y = (y as i32 + (k as i32 - half)).clamp(0, height as i32 - 1) as usize;
                     let p = ARgb::from_u32(temp_vec[src_y * width + x]);
-                    let w = kernel[k];
                     acc.0 += p.a * w;
                     acc.1 += p.r * w;
                     acc.2 += p.g * w;
@@ -154,17 +152,17 @@ fn generate_gaussian_kernel(radius: i32) -> Result<([u32; 17], u32), Error> {
     let mut kernel = [0u32; 17];
     let mut sum = 0u32;
 
-    for i in 0..size {
+    for (i, slot) in kernel.iter_mut().enumerate().take(size) {
         let x = (i as i32 - clamped_radius) as f64;
         let value = (-(x * x) / (2.0 * sigma * sigma)).exp();
         let scaled = (value * 1000.0).round() as u32;
-        kernel[i] = scaled;
+        *slot = scaled;
         sum += scaled;
     }
 
     #[allow(unreachable_code)]
     if sum == 0 {
-        return bail!("Kernel sum is zero");
+        bail!("Kernel sum is zero");
     }
     Ok((kernel, sum))
 }
