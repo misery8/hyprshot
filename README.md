@@ -66,7 +66,21 @@ sudo install -Dm755 target/release/clipboard /usr/lib/hyprshot/clipboard
 
 - Runtime:
     - `gtk4`, `glib2`, `cairo`
-    - `grim` (essential for screen capture)
+    - a Wayland compositor exposing `ext-image-copy-capture-v1` + `ext-image-capture-source-v1`, or `wlr-screencopy-unstable-v1` v3 as a compatibility fallback
+
+Hyprshot captures directly through Wayland and does not invoke an external screenshot utility.
+
+### Hyprland screencopy permission
+
+Direct screencopy is subject to Hyprland's screencopy permission policy when permission enforcement is enabled. The installed binary is `/usr/bin/hyprshot`; configure an `allow`, `ask`, or `deny` rule for that binary according to your Hyprland version and policy. Hyprshot never edits this configuration automatically.
+
+On current Hyprland releases using Lua configuration, an explicit allow rule is:
+
+```lua
+hl.permission({ binary = "/usr/bin/hyprshot", type = "screencopy", mode = "allow" })
+```
+
+If screencopy is denied, Hyprland may return a rendered permission-denied frame while the capture protocol itself completes normally; Hyprshot intentionally does not use pixel heuristics to hide or reinterpret that compositor response.
 
 ___
 

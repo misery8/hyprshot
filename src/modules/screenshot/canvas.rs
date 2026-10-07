@@ -2,8 +2,6 @@ use std::{cell::RefCell, rc::Rc, result::Result};
 
 use anyhow::Error;
 use cairo::{Context, ImageSurface};
-use gdk4::ffi::gdk_cairo_set_source_pixbuf;
-use glib::translate::ToGlibPtr;
 
 use crate::modules::screenshot::{
     render,
@@ -38,28 +36,14 @@ pub struct Canvas {
 
 impl Canvas {
     pub fn from_screenshot() -> Result<Self, Error> {
-        let surface = Rc::new(RefCell::new(Self::prepare_background_surface()));
+        let surface = Rc::new(RefCell::new(Self::prepare_background_surface()?));
         let history = RefCell::new(Vec::new());
 
         Ok(Self { surface, history })
     }
 
-    fn prepare_background_surface() -> ImageSurface {
-        let pixbuf = crate::capture::screenshot::capture::capture_fullscreen()
-            .expect("Failed to capture screen");
-
-        let surface = ImageSurface::create(cairo::Format::ARgb32, pixbuf.width(), pixbuf.height())
-            .expect("Failed to create surface");
-
-        {
-            let cr = Context::new(&surface).expect("Failed to create Cairo context");
-            unsafe {
-                gdk_cairo_set_source_pixbuf(cr.to_raw_none(), pixbuf.to_glib_none().0, 0.0, 0.0);
-            }
-            cr.paint().expect("Failed to paint pixbuf onto surface");
-        }
-
-        surface
+    fn prepare_background_surface() -> Result<ImageSurface, Error> {
+        crate::capture::screenshot::capture::capture_fullscreen()
     }
 
     pub fn get_screen_size(&self) -> (i32, i32) {
