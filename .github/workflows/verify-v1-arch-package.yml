@@ -23,7 +23,7 @@ jobs:
           persist-credentials: false
       - name: Assert exact tag provenance and release metadata
         run: |
-          test "$(git rev-parse HEAD)" = 'd964686e91ba2b621a16d3f4b4d30fa13f5321ab'
+          test "$(git -c safe.directory="$PWD" rev-parse HEAD)" = 'd964686e91ba2b621a16d3f4b4d30fa13f5321ab'
           grep -Fqx 'version = "1.0.0"' Cargo.toml
           grep -Fqx 'pkgver=1.0.0' PKGBUILD
           grep -Fqx 'pkgrel=1' PKGBUILD
