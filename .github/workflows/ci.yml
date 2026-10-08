@@ -42,5 +42,5 @@ jobs:
         run: cargo check --release --locked
       - name: Verify Arch package metadata
         run: |
-          makepkg --printsrcinfo > /tmp/hyprshot.srcinfo
+          runuser -u nobody -- makepkg --printsrcinfo > /tmp/hyprshot.srcinfo
           diff -u .SRCINFO /tmp/hyprshot.srcinfo
