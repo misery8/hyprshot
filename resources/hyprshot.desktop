@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Hyprshot
 Comment=Lightweight screenshot and annotation tool for Hyprland
-Exec=hyprshot
+Exec=hyprshot screen
 Terminal=false
 Type=Application
 Icon=hyprshot
