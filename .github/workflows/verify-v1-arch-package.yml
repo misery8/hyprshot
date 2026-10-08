@@ -1,0 +1,54 @@
+name: Verify v1.0.0 tagged Arch package
+
+on:
+  pull_request:
+    branches: [dev]
+
+jobs:
+  tagged-package:
+    if: github.head_ref == 'ci/verify-v1.0.0-package'
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+      - name: Install Arch package build dependencies
+        run: |
+          pacman -Syu --noconfirm \
+            base-devel git rust cargo gtk4 gtk4-layer-shell cairo glib2 \
+            wayland pkgconf
+      - name: Checkout v1.0.0 tagged source
+        uses: actions/checkout@v4
+        with:
+          ref: v1.0.0
+          persist-credentials: false
+      - name: Assert exact tag provenance and release metadata
+        run: |
+          test "$(git rev-parse HEAD)" = 'd964686e91ba2b621a16d3f4b4d30fa13f5321ab'
+          grep -Fqx 'version = "1.0.0"' Cargo.toml
+          grep -Fqx 'pkgver=1.0.0' PKGBUILD
+          grep -Fqx 'pkgrel=1' PKGBUILD
+          grep -Fq '#tag=v${pkgver}' PKGBUILD
+          ! grep -Eq "'grim'|'gdk-pixbuf2'" PKGBUILD
+      - name: Build real Arch package from Git tag
+        run: |
+          install -d -o nobody -g nobody -m 755 /tmp/hyprshot-v1-archbuild
+          install -m 644 PKGBUILD /tmp/hyprshot-v1-archbuild/PKGBUILD
+          runuser -u nobody -- env HOME=/tmp/hyprshot-v1-archbuild \
+            CARGO_HOME=/tmp/hyprshot-v1-archbuild/.cargo CARGO_BUILD_JOBS=2 \
+            sh -ec 'cd /tmp/hyprshot-v1-archbuild && makepkg --noconfirm --nodeps'
+      - name: Verify package manifest, dependencies and installed payload
+        run: |
+          package=/tmp/hyprshot-v1-archbuild/hyprshot-1.0.0-1-x86_64.pkg.tar.zst
+          test -s "$package"
+          pacman -Qip "$package"
+          bsdtar -xOf "$package" .PKGINFO > /tmp/hyprshot-pkginfo
+          grep -Fqx 'pkgname = hyprshot' /tmp/hyprshot-pkginfo
+          grep -Fqx 'pkgver = 1.0.0-1' /tmp/hyprshot-pkginfo
+          ! grep -Eq '^depend = (grim|gdk-pixbuf2)([<>=]|$)' /tmp/hyprshot-pkginfo
+          bsdtar -tf "$package" > /tmp/hyprshot-files
+          grep -Fxq 'usr/bin/hyprshot' /tmp/hyprshot-files
+          grep -Fxq 'usr/lib/hyprshot/clipboard' /tmp/hyprshot-files
+          grep -Fxq 'usr/share/applications/hyprshot.desktop' /tmp/hyprshot-files
+          grep -Fxq 'usr/share/icons/hicolor/scalable/apps/hyprshot.svg' /tmp/hyprshot-files
+          grep -Fxq 'usr/share/licenses/hyprshot/LICENSE' /tmp/hyprshot-files
+          echo TAGGED_ARCH_PACKAGE_VALIDATED
