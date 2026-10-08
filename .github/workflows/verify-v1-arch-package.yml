@@ -52,3 +52,10 @@ jobs:
           grep -Fxq 'usr/share/icons/hicolor/scalable/apps/hyprshot.svg' /tmp/hyprshot-files
           grep -Fxq 'usr/share/licenses/hyprshot/LICENSE' /tmp/hyprshot-files
           echo TAGGED_ARCH_PACKAGE_VALIDATED
+      - name: Upload built Arch package
+        uses: actions/upload-artifact@v4
+        with:
+          name: hyprshot-v1.0.0-arch-x86_64
+          path: /tmp/hyprshot-v1-archbuild/hyprshot-1.0.0-1-x86_64.pkg.tar.zst
+          if-no-files-found: error
+          retention-days: 30
