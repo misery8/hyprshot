@@ -51,7 +51,7 @@ Perfect for quick sharing, bug reporting, or visual notes — without leaving yo
 ### From Source
 
 Make sure you have:
-- Rust (1.75+)
+- Rust (1.88+)
 - `gtk4`, `glib2`, `cairo` development headers
 
 ```sh
