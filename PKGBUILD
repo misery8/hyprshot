@@ -1,5 +1,5 @@
 pkgname=hyprshot
-pkgver=0.4.0
+pkgver=1.0.0
 pkgrel=1
 pkgdesc="Lightweight screenshot and annotation tool for Hyprland (Rust version)"
 arch=('x86_64')
