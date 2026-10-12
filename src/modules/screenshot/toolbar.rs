@@ -97,7 +97,7 @@ fn toolbar_geometry_css() -> &'static str {
          min-height: 30px; \
          padding: 2px; \
          border-radius: 6px; \
-     }
+     }"
 }
 
 fn color_indicator_css((red, green, blue): (u8, u8, u8)) -> String {
