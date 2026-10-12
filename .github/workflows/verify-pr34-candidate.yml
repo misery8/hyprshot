@@ -1,0 +1,70 @@
+name: QA verify PR34 Arch candidate
+
+on:
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+      - name: Install exact-tag candidate build dependencies
+        run: |
+          pacman -Syu --noconfirm base-devel git rust cargo gtk4 gtk4-layer-shell cairo glib2 wayland pkgconf
+      - uses: actions/checkout@v4
+        with:
+          ref: 472583f8f84e16472b9a06000bbebeaa1e071822
+          fetch-depth: 0
+      - name: Assert PR34 exact source and literal git diff --check
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=6891df70dc9f40daccdc8994ad4aa2e22472d067
+          head=472583f8f84e16472b9a06000bbebeaa1e071822
+          actual="$(git -c safe.directory="$PWD" rev-parse HEAD)"
+          test "$actual" = "$head"
+          git -c safe.directory="$PWD" merge-base --is-ancestor "$base" "$head"
+          git -c safe.directory="$PWD" diff --check "$base"..."$head"
+          echo "PR34_EXACT_HEAD_DIFF_CHECK_PASS"
+      - name: Build **non-release** PR34 candidate package
+        shell: bash
+        run: |
+          set -euo pipefail
+          work=/tmp/hyprshot-qa
+          install -d -o nobody -g nobody -m 755 "$work"
+          install -m 644 PKGBUILD "$work/PKGBUILD"
+          python3 - "$work/PKGBUILD" <<'PY'
+          import pathlib,sys
+          p=pathlib.Path(sys.argv[1])
+          s=p.read_text()
+          assert s.count('pkgver=1.0.0') == 1
+          assert s.count('pkgrel=1') == 1
+          assert s.count('#tag=v${pkgver}') == 1
+          s=s.replace('pkgrel=1','pkgrel=2')
+          s=s.replace('#tag=v${pkgver}', '#commit=472583f8f84e16472b9a06000bbebeaa1e071822')
+          p.write_text(s)
+          PY
+          chown nobody:nobody "$work/PKGBUILD"
+          runuser -u nobody -- sh -c 'cd /tmp/hyprshot-qa && makepkg --noconfirm --nodeps'
+          pkg="$(find "$work" -maxdepth 1 -type f -name 'hyprshot-1.0.0-2-x86_64.pkg.tar.zst' -print -quit)"
+          test -n "$pkg"
+          pacman -Qip "$pkg"
+          pacman -Qlp "$pkg"
+          for name in usr/bin/hyprshot usr/lib/hyprshot/clipboard usr/share/applications/hyprshot.desktop usr/share/icons/hicolor/scalable/apps/hyprshot.svg; do
+            bsdtar -tf "$pkg" | grep -Fx "$name"
+          done
+          sha256sum "$pkg"
+          cp "$pkg" "$GITHUB_WORKSPACE/hyprshot-1.0.0-2-x86_64.pkg.tar.zst"
+          echo "PR34_COMMIT_PINNED_CANDIDATE_PACKAGE_VALIDATED"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hyprshot-pr34-arch-candidate-not-release
+          path: hyprshot-1.0.0-2-x86_64.pkg.tar.zst
+          if-no-files-found: error
+          retention-days: 14
