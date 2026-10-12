@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.0.1] - 2026-10-13
+
+Patch release for the installed GTK4 toolbar rendering regression (#33 / PR #34). The core screenshot workflow is unchanged.
+
+### Fixed
+
+- Restore Arrow, Rectangle, Undo and Palette symbolic icon appearance in GTK4 using supported symbolic foreground/stroke attributes and a mask-free palette path with four visible cutouts.
+- Load embedded icons by their GTK IconTheme names so symbolic recoloring and 24px tool / 28px Palette glyph sizing work correctly.
+- Restore the accepted rounded grouped toolbar surface, 36px main buttons and stable active/inactive visuals across Adwaita light/dark themes.
+- Make display-global toolbar CSS registration idempotent across repeated toolbar constructions, while retaining icon resources for surviving toolbars.
+
+### UI polish
+
+- Compact the 17 palette popup swatches to 26×26 GTK logical pixels and slightly increase the selected-color indicator request to 14×14.
+
+### Verification and compatibility
+
+- Exact-head Rust/GTK CI, negative SVG GResource contract checks, repeated-toolbar lifecycle and interaction checks, Arch candidate build, and targeted installed Hyprland visual acceptance completed before release preparation.
+- No changes to native capture, clipboard semantics, annotation algorithms, HiDPI/multi-output editor mapping or the future Screen/Video launcher. Outstanding work remains in separate issues #18, #25, #27–#32.
+
 ## [1.0.0] - 2026-10-08
 
 First stable release of the current Hyprshot screenshot and annotation workflow.
