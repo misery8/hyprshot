@@ -13,8 +13,8 @@ const TOOLBAR_GAP: i32 = 8;
 const BUTTON_SIZE: i32 = 36;
 const TOOL_ICON_SIZE: i32 = 24;
 const PALETTE_ICON_SIZE: i32 = 28;
-const COLOR_INDICATOR_SIZE: i32 = 12;
-const COLOR_SWATCH_SIZE: i32 = 24;
+const COLOR_INDICATOR_SIZE: i32 = 14;
+const COLOR_SWATCH_SIZE: i32 = 26;
 const ACTIVE_TOOL_CLASS: &str = "suggested-action";
 const COLOR_INDICATOR_CLASS: &str = "color-indicator";
 const TOOLBAR_CLASS: &str = "hyprshot-toolbar";
@@ -326,7 +326,7 @@ impl Toolbar {
                 .build();
 
             let color_css = format!(
-                "button {{ background: rgb({red}, {green}, {blue}); border: 1px solid #ccc; border-radius: 3px; }}"
+                "button {{ min-width: 24px; min-height: 24px; padding: 0px; background: rgb({red}, {green}, {blue}); border: 1px solid #ccc; border-radius: 3px; }}"
             );
 
             let provider = CssProvider::new();
@@ -605,7 +605,7 @@ mod tests {
         let css = toolbar_geometry_css();
 
         assert_eq!(BUTTON_SIZE, 36);
-        assert_eq!(COLOR_INDICATOR_SIZE, 12);
+        assert_eq!(COLOR_INDICATOR_SIZE, 14);
         assert!(css.contains("border-radius: 10px"));
         assert!(css.contains("padding: 4px"));
         assert!(css.contains("background-image: none"));
