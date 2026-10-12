@@ -51,7 +51,7 @@ jobs:
           p.write_text(s)
           PY
           chown nobody:nobody "$work/PKGBUILD"
-          runuser -u nobody -- sh -c 'cd /tmp/hyprshot-qa && makepkg --noconfirm --nodeps'
+          runuser -u nobody -- env HOME=/tmp/hyprshot-qa CARGO_HOME=/tmp/hyprshot-qa/.cargo sh -c 'cd /tmp/hyprshot-qa && makepkg --noconfirm --nodeps'
           pkg="$(find "$work" -maxdepth 1 -type f -name 'hyprshot-1.0.0-2-x86_64.pkg.tar.zst' -print -quit)"
           test -n "$pkg"
           pacman -Qip "$pkg"
