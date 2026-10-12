@@ -74,7 +74,6 @@ fn styled_display_registrations(display: &gtk4::gdk::Display) -> usize {
     })
 }
 
-
 const ARROW_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/diagonal-arrow-symbolic.svg";
 const ARROW_ACTIVE_ICON: &str =
     "/io/github/misery8/hyprshot/icons/symbolic/diagonal-arrow-active-symbolic.svg";
@@ -647,14 +646,20 @@ mod tests {
             .downcast::<Button>()
             .unwrap();
         let rectangle = arrow.next_sibling().unwrap().downcast::<Button>().unwrap();
-        let text = rectangle.next_sibling().unwrap().downcast::<Button>().unwrap();
+        let text = rectangle
+            .next_sibling()
+            .unwrap()
+            .downcast::<Button>()
+            .unwrap();
         let blur = text.next_sibling().unwrap().downcast::<Button>().unwrap();
         let undo = blur.next_sibling().unwrap().downcast::<Button>().unwrap();
 
         arrow.emit_clicked();
         assert!(matches!(
             rx.try_recv(),
-            Ok(AppAction::Screenshot(ScreenshotAction::SetTool(Tool::Arrow)))
+            Ok(AppAction::Screenshot(ScreenshotAction::SetTool(
+                Tool::Arrow
+            )))
         ));
         assert!(arrow.has_css_class(ACTIVE_TOOL_CLASS));
         let active_arrow = arrow.child().unwrap().downcast::<Image>().unwrap();
@@ -715,12 +720,17 @@ mod tests {
         white.emit_clicked();
         assert!(matches!(
             rx.try_recv(),
-            Ok(AppAction::Screenshot(ScreenshotAction::SetColor(255, 255, 255)))
+            Ok(AppAction::Screenshot(ScreenshotAction::SetColor(
+                255, 255, 255
+            )))
         ));
         while gtk4::glib::MainContext::default().pending() {
             gtk4::glib::MainContext::default().iteration(false);
         }
-        assert!(!popover.is_visible(), "second color click must dismiss popup");
+        assert!(
+            !popover.is_visible(),
+            "second color click must dismiss popup"
+        );
 
         // Tear down the first editor while another toolbar stays mounted:
         // the shared CSS/icon resources must still work, with no new registration.
@@ -739,8 +749,9 @@ mod tests {
         }
         assert_eq!(styled_display_registrations(&display), 1);
         assert_eq!(icon_path_count(), 1);
-        let (_, second_width, _, _) =
-            second_toolbar.widget().measure(gtk4::Orientation::Horizontal, -1);
+        let (_, second_width, _, _) = second_toolbar
+            .widget()
+            .measure(gtk4::Orientation::Horizontal, -1);
         assert_eq!(second_width, natural_width);
         assert!(theme.has_icon("hyprshot-diagonal-arrow-symbolic"));
         second_window.close();
