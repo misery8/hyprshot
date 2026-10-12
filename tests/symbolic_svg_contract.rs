@@ -176,11 +176,29 @@ fn source_and_compiled_gresource_toolbar_icons_follow_gtk_symbolic_contract() {
         let source = fs::read_to_string(path).expect("symbolic source SVG exists");
         check_symbolic(&source, shape).unwrap_or_else(|error| panic!("{name}: {error}"));
 
+        let themed_asset = format!("icons/scalable/actions/{name}");
+        let themed_file = format!(
+            r#"<file compressed="true" preprocess="xml-stripblanks" alias="{themed_asset}">{asset}</file>"#
+        );
+        assert!(
+            manifest.contains(&themed_file),
+            "{name}: missing GTK icon-theme GResource alias"
+        );
+
         let resource_path = format!("/io/github/misery8/hyprshot/{asset}");
         let embedded = resource
             .lookup_data(&resource_path, gio::ResourceLookupFlags::NONE)
             .unwrap_or_else(|error| panic!("{resource_path}: {error}"));
         let embedded = std::str::from_utf8(embedded.as_ref()).expect("embedded SVG is UTF-8");
+        let themed_path = format!("/io/github/misery8/hyprshot/{themed_asset}");
+        let themed = resource
+            .lookup_data(&themed_path, gio::ResourceLookupFlags::NONE)
+            .unwrap_or_else(|error| panic!("{themed_path}: {error}"));
+        assert_eq!(
+            themed.as_ref(),
+            embedded.as_bytes(),
+            "{name}: GTK named icon and direct GResource versions differ"
+        );
         check_symbolic(embedded, shape).unwrap_or_else(|error| panic!("embedded {name}: {error}"));
 
         assert_eq!(
