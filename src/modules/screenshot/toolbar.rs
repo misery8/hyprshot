@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::mpsc::Sender;
 
@@ -19,6 +19,61 @@ const ACTIVE_TOOL_CLASS: &str = "suggested-action";
 const COLOR_INDICATOR_CLASS: &str = "color-indicator";
 const TOOLBAR_CLASS: &str = "hyprshot-toolbar";
 const ICON_THEME_RESOURCE_PATH: &str = "/io/github/misery8/hyprshot/icons";
+
+// A display-global provider belongs to the display, not to any individual
+// toolbar. Keep only weak display identities: repeated activations must not
+// append duplicate providers or keep closed displays alive.
+thread_local! {
+    static STYLED_DISPLAYS: RefCell<Vec<glib::WeakRef<gtk4::gdk::Display>>> =
+        const { RefCell::new(Vec::new()) };
+}
+
+fn ensure_toolbar_display_resources(display: &gtk4::gdk::Display) {
+    let theme = gtk4::IconTheme::for_display(display);
+    if !theme
+        .resource_path()
+        .iter()
+        .any(|path| path.as_str() == ICON_THEME_RESOURCE_PATH)
+    {
+        theme.add_resource_path(ICON_THEME_RESOURCE_PATH);
+    }
+
+    STYLED_DISPLAYS.with(|registered| {
+        let mut registered = registered.borrow_mut();
+        registered.retain(|weak| weak.upgrade().is_some());
+
+        if registered.iter().any(|weak| {
+            weak.upgrade()
+                .is_some_and(|previous| previous == display.clone())
+        }) {
+            return;
+        }
+
+        let provider = CssProvider::new();
+        provider.load_from_data(toolbar_geometry_css());
+        gtk4::style_context_add_provider_for_display(
+            display,
+            &provider,
+            gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
+        registered.push(display.downgrade());
+    });
+}
+
+#[cfg(test)]
+fn styled_display_registrations(display: &gtk4::gdk::Display) -> usize {
+    STYLED_DISPLAYS.with(|registered| {
+        registered
+            .borrow()
+            .iter()
+            .filter(|weak| {
+                weak.upgrade()
+                    .is_some_and(|previous| previous == display.clone())
+            })
+            .count()
+    })
+}
+
 
 const ARROW_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/diagonal-arrow-symbolic.svg";
 const ARROW_ACTIVE_ICON: &str =
@@ -160,19 +215,10 @@ impl Toolbar {
             .vexpand(false)
             .build();
 
-        // Register the compiled symbolic files in GTK's hicolor resource namespace.
-        // The aliases in resources.gresource.xml preserve the original resource URLs.
-        gtk4::IconTheme::for_display(&container.display())
-            .add_resource_path(ICON_THEME_RESOURCE_PATH);
-
-        let toolbar_provider = CssProvider::new();
-        toolbar_provider.load_from_data(toolbar_geometry_css());
+        // Shared GTK display resources must only be installed once per display,
+        // even when GtkApplication activates and creates additional toolbars.
+        ensure_toolbar_display_resources(&container.display());
         container.add_css_class(TOOLBAR_CLASS);
-        gtk4::style_context_add_provider_for_display(
-            &container.display(),
-            &toolbar_provider,
-            gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
-        );
 
         let toolbar = Self { container };
 
