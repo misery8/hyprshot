@@ -28,5 +28,7 @@ jobs:
           test "$(git diff --name-only "$base"..."$head" | LC_ALL=C sort)" = "$(printf '%s\n' .SRCINFO CHANGELOG.md Cargo.lock Cargo.toml PKGBUILD | LC_ALL=C sort)"
           grep -Fx 'version = "1.0.1"' Cargo.toml
           grep -Fx 'pkgver=1.0.1' PKGBUILD
-          grep -Fx 'source = hyprshot-1.0.1::git+https://github.com/misery8/hyprshot.git#tag=v1.0.1' .SRCINFO
+          grep -Fx 
+          echo RELEASE_101_EXACT_HEAD_DIFF_PASS
+\tsource = hyprshot-1.0.1::git+https://github.com/misery8/hyprshot.git#tag=v1.0.1' .SRCINFO
           echo RELEASE_101_EXACT_HEAD_DIFF_PASS
