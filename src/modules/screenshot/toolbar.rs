@@ -98,6 +98,7 @@ fn set_tool_button_icon(button: &Button, tool: Tool, active: bool) {
 }
 
 fn toolbar_geometry_css() -> &'static str {
+    // Width is a GTK CSS content minimum: horizontal padding and border add 6px.
     ".hyprshot-toolbar { \
          border-radius: 12px; \
          padding: 3px; \
@@ -106,7 +107,7 @@ fn toolbar_geometry_css() -> &'static str {
      } \
      .hyprshot-toolbar > button, \
      .hyprshot-toolbar > menubutton > button { \
-         min-width: 30px; \
+         min-width: 26px; \
          min-height: 30px; \
          padding: 2px; \
          border-radius: 6px; \
@@ -489,7 +490,7 @@ mod tests {
             child = widget.next_sibling();
         }
         assert!(
-            (170..=245).contains(&natural_width) && (28..=52).contains(&natural_height),
+            (215..=235).contains(&natural_width) && (40..=48).contains(&natural_height),
             "toolbar grew beyond compact reference proportions"
         );
 
@@ -530,7 +531,7 @@ mod tests {
         assert!(css.contains("background-color: @theme_bg_color"));
         assert!(css.contains("alpha(@theme_fg_color, 0.12)"));
         assert!(css.contains(".hyprshot-toolbar > menubutton > button"));
-        assert!(css.contains("min-width: 30px"));
+        assert!(css.contains("min-width: 26px"));
         assert!(css.contains("min-height: 30px"));
         assert!(!css.contains("background-color: #"));
     }
