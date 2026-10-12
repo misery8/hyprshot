@@ -136,14 +136,9 @@ fn check_symbolic(svg: &str, shape: Shape) -> Result<(), String> {
     if matches!(shape, Shape::Palette) {
         if value("fill-rule") != Some("evenodd")
             || d.chars().filter(|&ch| ch == 'M').count() != 5
-            || ![
-                "M8.9 7.5",
-                "M13.4 5.9",
-                "M18.1 7.9",
-                "M8.2 12.3",
-            ]
-            .iter()
-            .all(|hole| d.contains(hole))
+            || !["M8.9 7.5", "M13.4 5.9", "M18.1 7.9", "M8.2 12.3"]
+                .iter()
+                .all(|hole| d.contains(hole))
         {
             return Err("palette must have four transparent compound-path cutouts".into());
         }

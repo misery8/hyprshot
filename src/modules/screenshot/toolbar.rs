@@ -507,7 +507,10 @@ mod tests {
             );
             assert!(natural >= BUTTON_SIZE, "release button was shrunk");
             if let Some(first_width) = first_width {
-                assert_eq!(natural, first_width, "palette and tools must have equal button widths");
+                assert_eq!(
+                    natural, first_width,
+                    "palette and tools must have equal button widths"
+                );
             } else {
                 first_width = Some(natural);
             }
