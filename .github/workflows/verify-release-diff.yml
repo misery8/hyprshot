@@ -1,0 +1,32 @@
+name: QA v1.0.1 release diff hygiene
+
+on:
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diff-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dfb0830b012e35ed5eab9453b837356ebaebee87
+          fetch-depth: 0
+      - name: Exact-head release metadata diff check
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=3278d65610e3d2ffb8c52ddbc8c27736b04d73e8
+          head=dfb0830b012e35ed5eab9453b837356ebaebee87
+          test "$(git rev-parse HEAD)" = "$head"
+          git merge-base --is-ancestor "$base" "$head"
+          git diff --check "$base"..."$head"
+          test "$(git diff --name-only "$base"..."$head" | LC_ALL=C sort)" = "$(printf '%s\n' .SRCINFO CHANGELOG.md Cargo.lock Cargo.toml PKGBUILD | LC_ALL=C sort)"
+          grep -Fx 'version = "1.0.1"' Cargo.toml
+          grep -Fx 'pkgver=1.0.1' PKGBUILD
+          grep -Fx 'source = hyprshot-1.0.1::git+https://github.com/misery8/hyprshot.git#tag=v1.0.1' .SRCINFO
+          echo RELEASE_101_EXACT_HEAD_DIFF_PASS
