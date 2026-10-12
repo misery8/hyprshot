@@ -494,6 +494,18 @@ mod tests {
             "toolbar grew beyond compact reference proportions"
         );
 
+        // Capture actual GTK pixels, not just widget allocations.
+        let capture = std::process::Command::new("import")
+            .args([
+                "-silent",
+                "-window",
+                "root",
+                "/tmp/hyprshot-toolbar-gtk-ci.png",
+            ])
+            .status()
+            .expect("ImageMagick import required for toolbar visual diagnostic");
+        assert!(capture.success(), "GTK screenshot capture failed");
+
         window.close();
     }
 

@@ -32,7 +32,8 @@ jobs:
             wayland \
             pkgconf \
             xorg-server-xvfb \
-            xorg-xauth
+            xorg-xauth \
+            imagemagick
       - uses: actions/checkout@v4
       - name: Check formatting
         run: cargo fmt --check
@@ -44,6 +45,10 @@ jobs:
         run: |
           HYPRSHOT_GTK_RENDER_TEST=1 xvfb-run -a -s "-screen 0 800x600x24" \
             cargo test --locked gtk_theme_resolves_toolbar_symbols_at_requested_size -- --test-threads=1 --nocapture
+          echo 'GTK_SCREENSHOT_BASE64_BEGIN'
+          base64 -w0 /tmp/hyprshot-toolbar-gtk-ci.png
+          echo
+          echo 'GTK_SCREENSHOT_BASE64_END'
       - name: Check release build
         run: cargo check --release --locked
       - name: Verify Arch package metadata
