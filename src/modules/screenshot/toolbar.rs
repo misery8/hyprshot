@@ -133,9 +133,11 @@ impl Toolbar {
         let toolbar_provider = CssProvider::new();
         toolbar_provider.load_from_data(toolbar_geometry_css());
         container.add_css_class(TOOLBAR_CLASS);
-        container
-            .style_context()
-            .add_provider(&toolbar_provider, gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION);
+        gtk4::style_context_add_provider_for_display(
+            &container.display(),
+            &toolbar_provider,
+            gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
 
         let toolbar = Self { container };
 
