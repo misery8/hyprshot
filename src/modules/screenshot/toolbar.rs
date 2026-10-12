@@ -496,9 +496,27 @@ mod tests {
         gtk4::gio::resources_register_include!("compiled.gresource")
             .expect("symbolic GResource must register");
 
-        let (tx, _rx) = std::sync::mpsc::channel();
-        let toolbar = Toolbar::new(tx);
-        let theme = gtk4::IconTheme::for_display(&toolbar.widget().display());
+        let (tx, rx) = std::sync::mpsc::channel();
+        let toolbar = Toolbar::new(tx.clone());
+        let display = toolbar.widget().display();
+        let theme = gtk4::IconTheme::for_display(&display);
+
+        // Repeated activations must not create any additional display-global
+        // providers or append the same hicolor resource path repeatedly.
+        assert_eq!(styled_display_registrations(&display), 1);
+        let icon_path_count = || {
+            theme
+                .resource_path()
+                .iter()
+                .filter(|path| path.as_str() == ICON_THEME_RESOURCE_PATH)
+                .count()
+        };
+        assert_eq!(icon_path_count(), 1);
+
+        let second_toolbar = Toolbar::new(tx.clone());
+        let third_toolbar = Toolbar::new(tx.clone());
+        assert_eq!(styled_display_registrations(&display), 1);
+        assert_eq!(icon_path_count(), 1);
 
         for resource in [
             ARROW_ICON,
@@ -619,8 +637,113 @@ mod tests {
             child = widget.next_sibling();
         }
         assert_eq!(swatches, 17, "palette must retain all available colors");
-        popover.popdown();
+
+        // Exercise actual GTK click handlers rather than only the pure next_tool
+        // helper; verify action delivery, active icon and toggle semantics.
+        let arrow = toolbar
+            .widget()
+            .first_child()
+            .unwrap()
+            .downcast::<Button>()
+            .unwrap();
+        let rectangle = arrow.next_sibling().unwrap().downcast::<Button>().unwrap();
+        let text = rectangle.next_sibling().unwrap().downcast::<Button>().unwrap();
+        let blur = text.next_sibling().unwrap().downcast::<Button>().unwrap();
+        let undo = blur.next_sibling().unwrap().downcast::<Button>().unwrap();
+
+        arrow.emit_clicked();
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(AppAction::Screenshot(ScreenshotAction::SetTool(Tool::Arrow)))
+        ));
+        assert!(arrow.has_css_class(ACTIVE_TOOL_CLASS));
+        let active_arrow = arrow.child().unwrap().downcast::<Image>().unwrap();
+        assert_eq!(
+            active_arrow.icon_name().as_deref(),
+            Some("hyprshot-diagonal-arrow-active-symbolic")
+        );
+        arrow.emit_clicked();
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(AppAction::Screenshot(ScreenshotAction::SetTool(Tool::None)))
+        ));
+        assert!(!arrow.has_css_class(ACTIVE_TOOL_CLASS));
+        assert_eq!(
+            arrow
+                .child()
+                .unwrap()
+                .downcast::<Image>()
+                .unwrap()
+                .icon_name()
+                .as_deref(),
+            Some("hyprshot-diagonal-arrow-symbolic")
+        );
+
+        for (button, tool) in [
+            (&rectangle, Tool::Rectangle),
+            (&text, Tool::Text),
+            (&blur, Tool::Blur),
+        ] {
+            button.emit_clicked();
+            match rx.try_recv() {
+                Ok(AppAction::Screenshot(ScreenshotAction::SetTool(received))) => {
+                    assert_eq!(received, tool);
+                }
+                _ => panic!("clicked tool did not send SetTool"),
+            }
+            assert!(button.has_css_class(ACTIVE_TOOL_CLASS));
+        }
+        undo.emit_clicked();
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(AppAction::Screenshot(ScreenshotAction::Undo))
+        ));
+
+        let black = grid.child_at(3, 3).unwrap().downcast::<Button>().unwrap();
+        black.emit_clicked();
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(AppAction::Screenshot(ScreenshotAction::SetColor(0, 0, 0)))
+        ));
+        while gtk4::glib::MainContext::default().pending() {
+            gtk4::glib::MainContext::default().iteration(false);
+        }
+        assert!(!popover.is_visible(), "color click must dismiss popup");
+
+        popover.popup();
+        let white = grid.child_at(0, 4).unwrap().downcast::<Button>().unwrap();
+        white.emit_clicked();
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(AppAction::Screenshot(ScreenshotAction::SetColor(255, 255, 255)))
+        ));
+        while gtk4::glib::MainContext::default().pending() {
+            gtk4::glib::MainContext::default().iteration(false);
+        }
+        assert!(!popover.is_visible(), "second color click must dismiss popup");
+
+        // Tear down the first editor while another toolbar stays mounted:
+        // the shared CSS/icon resources must still work, with no new registration.
+        let second_window = gtk4::Window::new();
+        second_toolbar.widget().set_opacity(1.0);
+        second_window.set_child(Some(second_toolbar.widget()));
+        second_window.present();
+        while gtk4::glib::MainContext::default().pending() {
+            gtk4::glib::MainContext::default().iteration(false);
+        }
         window.close();
+        drop(toolbar);
+        drop(third_toolbar);
+        while gtk4::glib::MainContext::default().pending() {
+            gtk4::glib::MainContext::default().iteration(false);
+        }
+        assert_eq!(styled_display_registrations(&display), 1);
+        assert_eq!(icon_path_count(), 1);
+        let (_, second_width, _, _) =
+            second_toolbar.widget().measure(gtk4::Orientation::Horizontal, -1);
+        assert_eq!(second_width, natural_width);
+        assert!(theme.has_icon("hyprshot-diagonal-arrow-symbolic"));
+        second_window.close();
     }
 
     #[test]
