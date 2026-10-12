@@ -476,6 +476,18 @@ mod tests {
         let (_, natural_width, _, _) = toolbar.widget().measure(gtk4::Orientation::Horizontal, -1);
         let (_, natural_height, _, _) = toolbar.widget().measure(gtk4::Orientation::Vertical, -1);
         eprintln!("GTK toolbar natural size: {natural_width}x{natural_height}");
+        let mut child = toolbar.widget().first_child();
+        while let Some(widget) = child {
+            let (minimum, natural, _, _) = widget.measure(gtk4::Orientation::Horizontal, -1);
+            eprintln!(
+                "GTK toolbar child {} width_request={} minimum={} natural={}",
+                widget.css_name(),
+                widget.width_request(),
+                minimum,
+                natural
+            );
+            child = widget.next_sibling();
+        }
         assert!(
             (170..=245).contains(&natural_width) && (28..=52).contains(&natural_height),
             "toolbar grew beyond compact reference proportions"
