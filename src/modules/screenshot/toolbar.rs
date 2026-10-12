@@ -11,13 +11,14 @@ use crate::modules::screenshot::state::{Rect, Tool};
 
 const TOOLBAR_GAP: i32 = 8;
 const BUTTON_SIZE: i32 = 30;
-const TOOL_ICON_SIZE: i32 = 24;
-const PALETTE_ICON_SIZE: i32 = 28;
+const TOOL_ICON_SIZE: i32 = 20;
+const PALETTE_ICON_SIZE: i32 = 24;
 const COLOR_INDICATOR_SIZE: i32 = 10;
 const COLOR_SWATCH_SIZE: i32 = 24;
 const ACTIVE_TOOL_CLASS: &str = "suggested-action";
 const COLOR_INDICATOR_CLASS: &str = "color-indicator";
 const TOOLBAR_CLASS: &str = "hyprshot-toolbar";
+const ICON_THEME_RESOURCE_PATH: &str = "/io/github/misery8/hyprshot/icons";
 
 const ARROW_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/diagonal-arrow-symbolic.svg";
 const ARROW_ACTIVE_ICON: &str =
@@ -52,8 +53,20 @@ fn tool_icon_resources(tool: Tool) -> Option<(&'static str, &'static str)> {
     }
 }
 
+fn themed_icon_name(resource: &str) -> String {
+    let filename = resource
+        .rsplit('/')
+        .next()
+        .expect("toolbar icon resource must include a filename");
+    let basename = filename
+        .strip_suffix(".svg")
+        .expect("toolbar icon resource must end in .svg");
+    format!("hyprshot-{basename}")
+}
+
 fn icon_image_sized(resource: &str, size: i32) -> Image {
-    let icon = Image::from_resource(resource);
+    // Only named GTK icons honor GtkImage::pixel-size and theme recoloring.
+    let icon = Image::from_icon_name(&themed_icon_name(resource));
     icon.set_opacity(1.0);
     icon.set_pixel_size(size);
     icon
@@ -129,6 +142,11 @@ impl Toolbar {
             .hexpand(false)
             .vexpand(false)
             .build();
+
+        // Register the compiled symbolic files in GTK's hicolor resource namespace.
+        // The aliases in resources.gresource.xml preserve the original resource URLs.
+        gtk4::IconTheme::for_display(&container.display())
+            .add_resource_path(ICON_THEME_RESOURCE_PATH);
 
         let toolbar_provider = CssProvider::new();
         toolbar_provider.load_from_data(toolbar_geometry_css());
@@ -403,6 +421,29 @@ mod tests {
             assert_ne!(normal_icon, active_icon);
             assert!(active_icon.contains("active"));
         }
+    }
+
+    #[test]
+    fn toolbar_named_symbolic_icons_have_the_expected_resource_identity() {
+        for resource in [
+            ARROW_ICON,
+            ARROW_ACTIVE_ICON,
+            RECTANGLE_ICON,
+            RECTANGLE_ACTIVE_ICON,
+            TEXT_ICON,
+            TEXT_ACTIVE_ICON,
+            BLUR_ICON,
+            BLUR_ACTIVE_ICON,
+            UNDO_ICON,
+            PALETTE_ICON,
+        ] {
+            let name = themed_icon_name(resource);
+            assert!(name.starts_with("hyprshot-"));
+            assert!(name.ends_with("-symbolic"));
+        }
+
+        assert_eq!(TOOL_ICON_SIZE, 20);
+        assert_eq!(PALETTE_ICON_SIZE, 24);
     }
 
     #[test]

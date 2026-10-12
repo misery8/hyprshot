@@ -11,5 +11,16 @@
     <file compressed="true" preprocess="xml-stripblanks">icons/symbolic/drop-water-symbolic.svg</file>
     <file compressed="true" preprocess="xml-stripblanks">icons/symbolic/drop-water-active-symbolic.svg</file>
     <file compressed="true" preprocess="xml-stripblanks">icons/symbolic/undo-symbolic.svg</file>
+    <!-- hicolor icon-theme aliases for GTK symbolic recoloring and intrinsic sizing -->
+    <file compressed="true" preprocess="xml-stripblanks" alias="icons/scalable/actions/hyprshot-palette-symbolic.svg">icons/symbolic/palette-symbolic.svg</file>
+    <file compressed="true" preprocess="xml-stripblanks" alias="icons/scalable/actions/hyprshot-diagonal-arrow-symbolic.svg">icons/symbolic/diagonal-arrow-symbolic.svg</file>
+    <file compressed="true" preprocess="xml-stripblanks" alias="icons/scalable/actions/hyprshot-diagonal-arrow-active-symbolic.svg">icons/symbolic/diagonal-arrow-active-symbolic.svg</file>
+    <file compressed="true" preprocess="xml-stripblanks" alias="icons/scalable/actions/hyprshot-rectangle-symbolic.svg">icons/symbolic/rectangle-symbolic.svg</file>
+    <file compressed="true" preprocess="xml-stripblanks" alias="icons/scalable/actions/hyprshot-rectangle-active-symbolic.svg">icons/symbolic/rectangle-active-symbolic.svg</file>
+    <file compressed="true" preprocess="xml-stripblanks" alias="icons/scalable/actions/hyprshot-text-symbolic.svg">icons/symbolic/text-symbolic.svg</file>
+    <file compressed="true" preprocess="xml-stripblanks" alias="icons/scalable/actions/hyprshot-text-active-symbolic.svg">icons/symbolic/text-active-symbolic.svg</file>
+    <file compressed="true" preprocess="xml-stripblanks" alias="icons/scalable/actions/hyprshot-drop-water-symbolic.svg">icons/symbolic/drop-water-symbolic.svg</file>
+    <file compressed="true" preprocess="xml-stripblanks" alias="icons/scalable/actions/hyprshot-drop-water-active-symbolic.svg">icons/symbolic/drop-water-active-symbolic.svg</file>
+    <file compressed="true" preprocess="xml-stripblanks" alias="icons/scalable/actions/hyprshot-undo-symbolic.svg">icons/symbolic/undo-symbolic.svg</file>
   </gresource>
 </gresources>

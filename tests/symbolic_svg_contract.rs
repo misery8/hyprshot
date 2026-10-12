@@ -176,7 +176,7 @@ fn source_and_compiled_gresource_toolbar_icons_follow_gtk_symbolic_contract() {
         let source = fs::read_to_string(path).expect("symbolic source SVG exists");
         check_symbolic(&source, shape).unwrap_or_else(|error| panic!("{name}: {error}"));
 
-        let themed_asset = format!("icons/scalable/actions/{name}");
+        let themed_asset = format!("icons/scalable/actions/hyprshot-{name}");
         let themed_file = format!(
             r#"<file compressed="true" preprocess="xml-stripblanks" alias="{themed_asset}">{asset}</file>"#
         );
