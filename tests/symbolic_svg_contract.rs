@@ -136,7 +136,7 @@ fn check_symbolic(svg: &str, shape: Shape) -> Result<(), String> {
     if matches!(shape, Shape::Palette) {
         if value("fill-rule") != Some("evenodd")
             || d.chars().filter(|&ch| ch == 'M').count() != 5
-            || !["M 9.427 8.265", "M 12 6.937", "M 15.901 8.597", "M 7.684 12.249"]
+            || !["M 9.427 8.265", "M 13.162 6.937", "M 17.063 8.597", "M 8.846 12.249"]
                 .iter()
                 .all(|hole| d.contains(hole))
         {
