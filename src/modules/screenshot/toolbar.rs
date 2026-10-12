@@ -536,7 +536,10 @@ mod tests {
             .expect("palette button child is the icon and indicator overlay");
         let color_indicator = overlay.last_child().expect("overlay has color indicator");
         assert_eq!(
-            (color_indicator.width_request(), color_indicator.height_request()),
+            (
+                color_indicator.width_request(),
+                color_indicator.height_request()
+            ),
             (14, 14),
             "palette selection indicator should be slightly larger"
         );
@@ -561,7 +564,11 @@ mod tests {
             let (_, width, _, _) = button.measure(gtk4::Orientation::Horizontal, -1);
             let (_, height, _, _) = button.measure(gtk4::Orientation::Vertical, -1);
             eprintln!("GTK color swatch actual size: {width}x{height}");
-            assert_eq!((width, height), (26, 26), "popover color swatch not compact");
+            assert_eq!(
+                (width, height),
+                (26, 26),
+                "popover color swatch not compact"
+            );
             swatches += 1;
             child = widget.next_sibling();
         }
