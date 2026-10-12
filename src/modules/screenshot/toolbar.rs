@@ -10,10 +10,10 @@ use crate::action::{AppAction, ScreenshotAction};
 use crate::modules::screenshot::state::{Rect, Tool};
 
 const TOOLBAR_GAP: i32 = 8;
-const BUTTON_SIZE: i32 = 30;
-const TOOL_ICON_SIZE: i32 = 20;
-const PALETTE_ICON_SIZE: i32 = 24;
-const COLOR_INDICATOR_SIZE: i32 = 10;
+const BUTTON_SIZE: i32 = 36;
+const TOOL_ICON_SIZE: i32 = 24;
+const PALETTE_ICON_SIZE: i32 = 28;
+const COLOR_INDICATOR_SIZE: i32 = 12;
 const COLOR_SWATCH_SIZE: i32 = 24;
 const ACTIVE_TOOL_CLASS: &str = "suggested-action";
 const COLOR_INDICATOR_CLASS: &str = "color-indicator";
@@ -102,8 +102,8 @@ fn toolbar_geometry_css() -> &'static str {
     // Legacy theme colors adapt in light/dark modes; literal fallbacks cover
     // themes that omit the named colors.
     ".hyprshot-toolbar { \
-         border-radius: 12px; \
-         padding: 3px; \
+         border-radius: 10px; \
+         padding: 4px; \
          background-image: none; \
          background-color: rgba(231, 235, 239, 0.97); \
          background-color: mix(@theme_bg_color, @theme_fg_color, 0.07); \
@@ -149,7 +149,7 @@ impl Toolbar {
     pub fn new(tx: Sender<AppAction>) -> Self {
         let container = Box::builder()
             .orientation(gtk4::Orientation::Horizontal)
-            .spacing(5)
+            .spacing(6)
             .focusable(false)
             .halign(gtk4::Align::Start)
             .valign(gtk4::Align::Start)
@@ -494,6 +494,8 @@ mod tests {
         let (_, natural_height, _, _) = toolbar.widget().measure(gtk4::Orientation::Vertical, -1);
         eprintln!("GTK toolbar natural size: {natural_width}x{natural_height}");
         let mut child = toolbar.widget().first_child();
+        let mut button_count = 0;
+        let mut first_width = None;
         while let Some(widget) = child {
             let (minimum, natural, _, _) = widget.measure(gtk4::Orientation::Horizontal, -1);
             eprintln!(
@@ -503,11 +505,19 @@ mod tests {
                 minimum,
                 natural
             );
+            assert!(natural >= BUTTON_SIZE, "release button was shrunk");
+            if let Some(first_width) = first_width {
+                assert_eq!(natural, first_width, "palette and tools must have equal button widths");
+            } else {
+                first_width = Some(natural);
+            }
+            button_count += 1;
             child = widget.next_sibling();
         }
+        assert_eq!(button_count, 6, "expected five tools and a palette button");
         assert!(
-            (215..=235).contains(&natural_width) && (40..=48).contains(&natural_height),
-            "toolbar grew beyond compact reference proportions"
+            (250..=285).contains(&natural_width) && (42..=55).contains(&natural_height),
+            "GTK toolbar does not preserve release-size controls"
         );
 
         window.close();
@@ -532,18 +542,18 @@ mod tests {
             assert!(name.ends_with("-symbolic"));
         }
 
-        assert_eq!(TOOL_ICON_SIZE, 20);
-        assert_eq!(PALETTE_ICON_SIZE, 24);
+        assert_eq!(TOOL_ICON_SIZE, 24);
+        assert_eq!(PALETTE_ICON_SIZE, 28);
     }
 
     #[test]
     fn toolbar_geometry_css_restores_compact_theme_aware_button_group() {
         let css = toolbar_geometry_css();
 
-        assert_eq!(BUTTON_SIZE, 30);
-        assert_eq!(COLOR_INDICATOR_SIZE, 10);
-        assert!(css.contains("border-radius: 12px"));
-        assert!(css.contains("padding: 3px"));
+        assert_eq!(BUTTON_SIZE, 36);
+        assert_eq!(COLOR_INDICATOR_SIZE, 12);
+        assert!(css.contains("border-radius: 10px"));
+        assert!(css.contains("padding: 4px"));
         assert!(css.contains("background-image: none"));
         assert!(css.contains("background-color: rgba(231, 235, 239, 0.97)"));
         assert!(css.contains("mix(@theme_bg_color, @theme_fg_color, 0.07)"));

@@ -120,7 +120,7 @@ fn check_symbolic(svg: &str, shape: Shape) -> Result<(), String> {
         Shape::Outline => {
             if value("class") != Some("transparent-fill foreground-stroke")
                 || value("fill") != Some("none")
-                || value("stroke-width") != Some("1.9")
+                || value("stroke-width") != Some("2.25")
                 || value("stroke").is_none()
             {
                 return Err("outline lacks GTK foreground-stroke contract".into());
@@ -137,10 +137,10 @@ fn check_symbolic(svg: &str, shape: Shape) -> Result<(), String> {
         if value("fill-rule") != Some("evenodd")
             || d.chars().filter(|&ch| ch == 'M').count() != 5
             || ![
-                "M 9.427 8.265",
-                "M 13.162 6.937",
-                "M 17.063 8.597",
-                "M 8.846 12.249",
+                "M8.9 7.5",
+                "M13.4 5.9",
+                "M18.1 7.9",
+                "M8.2 12.3",
             ]
             .iter()
             .all(|hole| d.contains(hole))
