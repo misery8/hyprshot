@@ -1,0 +1,71 @@
+name: QA verify v1.0.1 exact-tag Arch package
+
+on:
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tagged-package:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+      - name: Install clean Arch build dependencies
+        run: |
+          pacman -Syu --noconfirm base-devel git rust cargo gtk4 gtk4-layer-shell cairo glib2 wayland pkgconf
+      - uses: actions/checkout@v4
+        with:
+          ref: v1.0.1
+          fetch-depth: 0
+      - name: Verify exact immutable tag and canonical metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=9e95dee0b19a8c74427476af44ee786c02bbf60b
+          actual="$(git -c safe.directory="$PWD" rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test "$(git -c safe.directory="$PWD" rev-parse 'v1.0.1^{}')" = "$expected"
+          grep -Fx 'version = "1.0.1"' Cargo.toml
+          grep -Fx 'pkgver=1.0.1' PKGBUILD
+          grep -Fx 'pkgrel=1' PKGBUILD
+          grep -F 'source = hyprshot-1.0.1::git+https://github.com/misery8/hyprshot.git#tag=v1.0.1' .SRCINFO
+          work=/tmp/hyprshot-tag-srcinfo
+          install -d -o nobody -g nobody -m 755 "$work"
+          install -m 644 PKGBUILD "$work/PKGBUILD"
+          runuser -u nobody -- env HOME="$work" sh -c 'cd /tmp/hyprshot-tag-srcinfo && makepkg --printsrcinfo' > /tmp/hyprshot-tag.srcinfo
+          diff -u .SRCINFO /tmp/hyprshot-tag.srcinfo
+          echo V101_EXACT_TAG_AND_META_VALIDATED
+      - name: Build from v1.0.1 original PKGBUILD using makepkg
+        shell: bash
+        run: |
+          set -euo pipefail
+          work=/tmp/hyprshot-tagpkg
+          install -d -o nobody -g nobody -m 755 "$work"
+          install -m 644 PKGBUILD "$work/PKGBUILD"
+          chown nobody:nobody "$work/PKGBUILD"
+          runuser -u nobody -- env HOME="$work" CARGO_HOME="$work/.cargo" sh -c 'cd /tmp/hyprshot-tagpkg && makepkg --noconfirm --nodeps'
+          expected=9e95dee0b19a8c74427476af44ee786c02bbf60b
+          actual="$(git -c safe.directory="$work/src/hyprshot-1.0.1" -C "$work/src/hyprshot-1.0.1" rev-parse HEAD)"
+          test "$actual" = "$expected"
+          pkg="$work/hyprshot-1.0.1-1-x86_64.pkg.tar.zst"
+          test -s "$pkg"
+          pacman -Qip "$pkg"
+          pacman -Qlp "$pkg"
+          pacman -Qip "$pkg" | grep -qF 'Version         : 1.0.1-1'
+          pacman -Qip "$pkg" | grep -qF 'Depends On      : gtk4  glib2  cairo  gtk4-layer-shell'
+          for name in usr/bin/hyprshot usr/lib/hyprshot/clipboard usr/share/applications/hyprshot.desktop usr/share/icons/hicolor/scalable/apps/hyprshot.svg usr/share/licenses/hyprshot/LICENSE; do
+            bsdtar -tf "$pkg" | grep -Fx "$name"
+          done
+          sha256sum "$pkg"
+          cp "$pkg" "$GITHUB_WORKSPACE/hyprshot-1.0.1-1-x86_64.pkg.tar.zst"
+          echo V101_EXACT_TAG_ARCH_PACKAGE_VALIDATED
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hyprshot-v1.0.1-exact-tag-arch-x86_64
+          path: hyprshot-1.0.1-1-x86_64.pkg.tar.zst
+          if-no-files-found: error
+          retention-days: 30
