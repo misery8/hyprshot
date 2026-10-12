@@ -523,6 +523,50 @@ mod tests {
             "GTK toolbar does not preserve release-size controls"
         );
 
+        let palette_button = toolbar
+            .widget()
+            .last_child()
+            .expect("toolbar has a palette MenuButton")
+            .downcast::<MenuButton>()
+            .expect("last toolbar child is the palette MenuButton");
+        let overlay = palette_button
+            .child()
+            .expect("palette MenuButton has an overlay")
+            .downcast::<Overlay>()
+            .expect("palette button child is the icon and indicator overlay");
+        let color_indicator = overlay.last_child().expect("overlay has color indicator");
+        assert_eq!(
+            (color_indicator.width_request(), color_indicator.height_request()),
+            (14, 14),
+            "palette selection indicator should be slightly larger"
+        );
+
+        let popover = palette_button.popover().expect("palette has a popover");
+        popover.popup();
+        while gtk4::glib::MainContext::default().pending() {
+            gtk4::glib::MainContext::default().iteration(false);
+        }
+        let grid = popover
+            .child()
+            .expect("popover contains swatch grid")
+            .downcast::<Grid>()
+            .expect("palette popup child is a Grid");
+        let mut child = grid.first_child();
+        let mut swatches = 0;
+        while let Some(widget) = child {
+            let button = widget
+                .clone()
+                .downcast::<Button>()
+                .expect("grid only contains color swatch buttons");
+            let (_, width, _, _) = button.measure(gtk4::Orientation::Horizontal, -1);
+            let (_, height, _, _) = button.measure(gtk4::Orientation::Vertical, -1);
+            eprintln!("GTK color swatch actual size: {width}x{height}");
+            assert_eq!((width, height), (26, 26), "popover color swatch not compact");
+            swatches += 1;
+            child = widget.next_sibling();
+        }
+        assert_eq!(swatches, 17, "palette must retain all available colors");
+        popover.popdown();
         window.close();
     }
 
