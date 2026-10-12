@@ -98,12 +98,17 @@ fn set_tool_button_icon(button: &Button, tool: Tool, active: bool) {
 }
 
 fn toolbar_geometry_css() -> &'static str {
-    // Width is a GTK CSS content minimum: horizontal padding and border add 6px.
+    // Paint the shared surface and button faces independently of GTK defaults.
+    // Legacy theme colors adapt in light/dark modes; literal fallbacks cover
+    // themes that omit the named colors.
     ".hyprshot-toolbar { \
          border-radius: 12px; \
          padding: 3px; \
-         background-color: @theme_bg_color; \
-         border: 1px solid alpha(@theme_fg_color, 0.12); \
+         background-image: none; \
+         background-color: rgba(231, 235, 239, 0.97); \
+         background-color: mix(@theme_bg_color, @theme_fg_color, 0.07); \
+         border: 1px solid rgba(100, 105, 112, 0.22); \
+         border-color: alpha(@theme_fg_color, 0.14); \
      } \
      .hyprshot-toolbar > button, \
      .hyprshot-toolbar > menubutton > button { \
@@ -111,6 +116,17 @@ fn toolbar_geometry_css() -> &'static str {
          min-height: 30px; \
          padding: 2px; \
          border-radius: 6px; \
+         background-image: none; \
+         background-color: rgba(244, 247, 250, 0.98); \
+         background-color: mix(@theme_bg_color, @theme_fg_color, 0.02); \
+         border: 1px solid rgba(100, 105, 112, 0.15); \
+         border-color: alpha(@theme_fg_color, 0.14); \
+     } \
+     .hyprshot-toolbar > button.suggested-action { \
+         background-color: #3584e4; \
+         background-color: @theme_selected_bg_color; \
+         color: #ffffff; \
+         color: @theme_selected_fg_color; \
      }"
 }
 
@@ -540,12 +556,14 @@ mod tests {
         assert_eq!(COLOR_INDICATOR_SIZE, 10);
         assert!(css.contains("border-radius: 12px"));
         assert!(css.contains("padding: 3px"));
-        assert!(css.contains("background-color: @theme_bg_color"));
-        assert!(css.contains("alpha(@theme_fg_color, 0.12)"));
+        assert!(css.contains("background-image: none"));
+        assert!(css.contains("background-color: rgba(231, 235, 239, 0.97)"));
+        assert!(css.contains("mix(@theme_bg_color, @theme_fg_color, 0.07)"));
+        assert!(css.contains("background-color: rgba(244, 247, 250, 0.98)"));
         assert!(css.contains(".hyprshot-toolbar > menubutton > button"));
+        assert!(css.contains(".hyprshot-toolbar > button.suggested-action"));
         assert!(css.contains("min-width: 26px"));
         assert!(css.contains("min-height: 30px"));
-        assert!(!css.contains("background-color: #"));
     }
 
     #[test]
