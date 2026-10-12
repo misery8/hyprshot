@@ -30,7 +30,9 @@ jobs:
             cairo \
             glib2 \
             wayland \
-            pkgconf
+            pkgconf \
+            xorg-server-xvfb \
+            xorg-xauth
       - uses: actions/checkout@v4
       - name: Check formatting
         run: cargo fmt --check
@@ -38,6 +40,10 @@ jobs:
         run: cargo clippy --locked --all-targets -- -D warnings
       - name: Run tests
         run: cargo test --locked
+      - name: Run real GTK symbolic icon contract under Xvfb
+        run: |
+          HYPRSHOT_GTK_RENDER_TEST=1 xvfb-run -a -s "-screen 0 800x600x24" \
+            cargo test --locked gtk_theme_resolves_toolbar_symbols_at_requested_size -- --test-threads=1 --nocapture
       - name: Check release build
         run: cargo check --release --locked
       - name: Verify Arch package metadata

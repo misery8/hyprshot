@@ -424,6 +424,67 @@ mod tests {
     }
 
     #[test]
+    fn gtk_theme_resolves_toolbar_symbols_at_requested_size() {
+        if std::env::var_os("HYPRSHOT_GTK_RENDER_TEST").is_none() {
+            return;
+        }
+
+        gtk4::init().expect("GTK4 display required for symbolic icon integration");
+        gtk4::gio::resources_register_include!("compiled.gresource")
+            .expect("symbolic GResource must register");
+
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let toolbar = Toolbar::new(tx);
+        let theme = gtk4::IconTheme::for_display(&toolbar.widget().display());
+
+        for resource in [
+            ARROW_ICON,
+            ARROW_ACTIVE_ICON,
+            RECTANGLE_ICON,
+            RECTANGLE_ACTIVE_ICON,
+            TEXT_ICON,
+            TEXT_ACTIVE_ICON,
+            BLUR_ICON,
+            BLUR_ACTIVE_ICON,
+            UNDO_ICON,
+            PALETTE_ICON,
+        ] {
+            let icon_name = themed_icon_name(resource);
+            assert!(theme.has_icon(&icon_name), "GTK cannot find {icon_name}");
+        }
+
+        let image = icon_image(ARROW_ICON);
+        assert_eq!(image.storage_type(), gtk4::ImageType::IconName);
+        assert_eq!(image.pixel_size(), TOOL_ICON_SIZE);
+        assert_eq!(
+            image.icon_name().as_deref(),
+            Some("hyprshot-diagonal-arrow-symbolic")
+        );
+
+        let palette = icon_image_sized(PALETTE_ICON, PALETTE_ICON_SIZE);
+        assert_eq!(palette.storage_type(), gtk4::ImageType::IconName);
+        assert_eq!(palette.pixel_size(), PALETTE_ICON_SIZE);
+
+        let window = gtk4::Window::new();
+        toolbar.widget().set_opacity(1.0);
+        window.set_child(Some(toolbar.widget()));
+        window.present();
+        while gtk4::glib::MainContext::default().pending() {
+            gtk4::glib::MainContext::default().iteration(false);
+        }
+
+        let (_, natural_width, _, _) = toolbar.widget().measure(gtk4::Orientation::Horizontal, -1);
+        let (_, natural_height, _, _) = toolbar.widget().measure(gtk4::Orientation::Vertical, -1);
+        eprintln!("GTK toolbar natural size: {natural_width}x{natural_height}");
+        assert!(
+            (170..=245).contains(&natural_width) && (28..=52).contains(&natural_height),
+            "toolbar grew beyond compact reference proportions"
+        );
+
+        window.close();
+    }
+
+    #[test]
     fn toolbar_named_symbolic_icons_have_the_expected_resource_identity() {
         for resource in [
             ARROW_ICON,
