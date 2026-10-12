@@ -10,10 +10,10 @@ use crate::action::{AppAction, ScreenshotAction};
 use crate::modules::screenshot::state::{Rect, Tool};
 
 const TOOLBAR_GAP: i32 = 8;
-const BUTTON_SIZE: i32 = 36;
+const BUTTON_SIZE: i32 = 30;
 const TOOL_ICON_SIZE: i32 = 24;
 const PALETTE_ICON_SIZE: i32 = 28;
-const COLOR_INDICATOR_SIZE: i32 = 12;
+const COLOR_INDICATOR_SIZE: i32 = 10;
 const COLOR_SWATCH_SIZE: i32 = 24;
 const ACTIVE_TOOL_CLASS: &str = "suggested-action";
 const COLOR_INDICATOR_CLASS: &str = "color-indicator";
@@ -85,7 +85,19 @@ fn set_tool_button_icon(button: &Button, tool: Tool, active: bool) {
 }
 
 fn toolbar_geometry_css() -> &'static str {
-    ".hyprshot-toolbar { border-radius: 10px; padding: 4px; }"
+    ".hyprshot-toolbar { \
+         border-radius: 12px; \
+         padding: 3px; \
+         background-color: @theme_bg_color; \
+         border: 1px solid alpha(@theme_fg_color, 0.12); \
+     } \
+     .hyprshot-toolbar > button, \
+     .hyprshot-toolbar > menubutton > button { \
+         min-width: 30px; \
+         min-height: 30px; \
+         padding: 2px; \
+         border-radius: 6px; \
+     }
 }
 
 fn color_indicator_css((red, green, blue): (u8, u8, u8)) -> String {
@@ -107,7 +119,7 @@ impl Toolbar {
     pub fn new(tx: Sender<AppAction>) -> Self {
         let container = Box::builder()
             .orientation(gtk4::Orientation::Horizontal)
-            .spacing(6)
+            .spacing(5)
             .focusable(false)
             .halign(gtk4::Align::Start)
             .valign(gtk4::Align::Start)
@@ -392,13 +404,19 @@ mod tests {
     }
 
     #[test]
-    fn toolbar_geometry_css_stays_theme_neutral() {
+    fn toolbar_geometry_css_restores_compact_theme_aware_button_group() {
         let css = toolbar_geometry_css();
 
-        assert!(css.contains("border-radius: 10px"));
-        assert!(css.contains("padding: 4px"));
-        assert!(!css.contains("background"));
-        assert!(!css.contains("color:"));
+        assert_eq!(BUTTON_SIZE, 30);
+        assert_eq!(COLOR_INDICATOR_SIZE, 10);
+        assert!(css.contains("border-radius: 12px"));
+        assert!(css.contains("padding: 3px"));
+        assert!(css.contains("background-color: @theme_bg_color"));
+        assert!(css.contains("alpha(@theme_fg_color, 0.12)"));
+        assert!(css.contains(".hyprshot-toolbar > menubutton > button"));
+        assert!(css.contains("min-width: 30px"));
+        assert!(css.contains("min-height: 30px"));
+        assert!(!css.contains("background-color: #"));
     }
 
     #[test]
