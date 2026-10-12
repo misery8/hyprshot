@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::mpsc::Sender;
 
@@ -13,11 +13,66 @@ const TOOLBAR_GAP: i32 = 8;
 const BUTTON_SIZE: i32 = 36;
 const TOOL_ICON_SIZE: i32 = 24;
 const PALETTE_ICON_SIZE: i32 = 28;
-const COLOR_INDICATOR_SIZE: i32 = 12;
-const COLOR_SWATCH_SIZE: i32 = 24;
+const COLOR_INDICATOR_SIZE: i32 = 14;
+const COLOR_SWATCH_SIZE: i32 = 26;
 const ACTIVE_TOOL_CLASS: &str = "suggested-action";
 const COLOR_INDICATOR_CLASS: &str = "color-indicator";
 const TOOLBAR_CLASS: &str = "hyprshot-toolbar";
+const ICON_THEME_RESOURCE_PATH: &str = "/io/github/misery8/hyprshot/icons";
+
+// A display-global provider belongs to the display, not to any individual
+// toolbar. Keep only weak display identities: repeated activations must not
+// append duplicate providers or keep closed displays alive.
+thread_local! {
+    static STYLED_DISPLAYS: RefCell<Vec<glib::WeakRef<gtk4::gdk::Display>>> =
+        const { RefCell::new(Vec::new()) };
+}
+
+fn ensure_toolbar_display_resources(display: &gtk4::gdk::Display) {
+    let theme = gtk4::IconTheme::for_display(display);
+    if !theme
+        .resource_path()
+        .iter()
+        .any(|path| path.as_str() == ICON_THEME_RESOURCE_PATH)
+    {
+        theme.add_resource_path(ICON_THEME_RESOURCE_PATH);
+    }
+
+    STYLED_DISPLAYS.with(|registered| {
+        let mut registered = registered.borrow_mut();
+        registered.retain(|weak| weak.upgrade().is_some());
+
+        if registered.iter().any(|weak| {
+            weak.upgrade()
+                .is_some_and(|previous| previous == display.clone())
+        }) {
+            return;
+        }
+
+        let provider = CssProvider::new();
+        provider.load_from_data(toolbar_geometry_css());
+        gtk4::style_context_add_provider_for_display(
+            display,
+            &provider,
+            gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
+        registered.push(display.downgrade());
+    });
+}
+
+#[cfg(test)]
+fn styled_display_registrations(display: &gtk4::gdk::Display) -> usize {
+    STYLED_DISPLAYS.with(|registered| {
+        registered
+            .borrow()
+            .iter()
+            .filter(|weak| {
+                weak.upgrade()
+                    .is_some_and(|previous| previous == display.clone())
+            })
+            .count()
+    })
+}
 
 const ARROW_ICON: &str = "/io/github/misery8/hyprshot/icons/symbolic/diagonal-arrow-symbolic.svg";
 const ARROW_ACTIVE_ICON: &str =
@@ -52,8 +107,20 @@ fn tool_icon_resources(tool: Tool) -> Option<(&'static str, &'static str)> {
     }
 }
 
+fn themed_icon_name(resource: &str) -> String {
+    let filename = resource
+        .rsplit('/')
+        .next()
+        .expect("toolbar icon resource must include a filename");
+    let basename = filename
+        .strip_suffix(".svg")
+        .expect("toolbar icon resource must end in .svg");
+    format!("hyprshot-{basename}")
+}
+
 fn icon_image_sized(resource: &str, size: i32) -> Image {
-    let icon = Image::from_resource(resource);
+    // Only named GTK icons honor GtkImage::pixel-size and theme recoloring.
+    let icon = Image::from_icon_name(&themed_icon_name(resource));
     icon.set_opacity(1.0);
     icon.set_pixel_size(size);
     icon
@@ -85,7 +152,36 @@ fn set_tool_button_icon(button: &Button, tool: Tool, active: bool) {
 }
 
 fn toolbar_geometry_css() -> &'static str {
-    ".hyprshot-toolbar { border-radius: 10px; padding: 4px; }"
+    // Paint the shared surface and button faces independently of GTK defaults.
+    // Legacy theme colors adapt in light/dark modes; literal fallbacks cover
+    // themes that omit the named colors.
+    ".hyprshot-toolbar { \
+         border-radius: 10px; \
+         padding: 4px; \
+         background-image: none; \
+         background-color: rgba(231, 235, 239, 0.97); \
+         background-color: mix(@theme_bg_color, @theme_fg_color, 0.07); \
+         border: 1px solid rgba(100, 105, 112, 0.22); \
+         border-color: alpha(@theme_fg_color, 0.14); \
+     } \
+     .hyprshot-toolbar > button, \
+     .hyprshot-toolbar > menubutton > button { \
+         min-width: 26px; \
+         min-height: 30px; \
+         padding: 2px; \
+         border-radius: 6px; \
+         background-image: none; \
+         background-color: rgba(244, 247, 250, 0.98); \
+         background-color: mix(@theme_bg_color, @theme_fg_color, 0.02); \
+         border: 1px solid rgba(100, 105, 112, 0.15); \
+         border-color: alpha(@theme_fg_color, 0.14); \
+     } \
+     .hyprshot-toolbar > button.suggested-action { \
+         background-color: #3584e4; \
+         background-color: @theme_selected_bg_color; \
+         color: #ffffff; \
+         color: @theme_selected_fg_color; \
+     }"
 }
 
 fn color_indicator_css((red, green, blue): (u8, u8, u8)) -> String {
@@ -118,12 +214,10 @@ impl Toolbar {
             .vexpand(false)
             .build();
 
-        let toolbar_provider = CssProvider::new();
-        toolbar_provider.load_from_data(toolbar_geometry_css());
+        // Shared GTK display resources must only be installed once per display,
+        // even when GtkApplication activates and creates additional toolbars.
+        ensure_toolbar_display_resources(&container.display());
         container.add_css_class(TOOLBAR_CLASS);
-        container
-            .style_context()
-            .add_provider(&toolbar_provider, gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION);
 
         let toolbar = Self { container };
 
@@ -277,7 +371,7 @@ impl Toolbar {
                 .build();
 
             let color_css = format!(
-                "button {{ background: rgb({red}, {green}, {blue}); border: 1px solid #ccc; border-radius: 3px; }}"
+                "button {{ min-width: 24px; min-height: 24px; padding: 0px; background: rgb({red}, {green}, {blue}); border: 1px solid #ccc; border-radius: 3px; }}"
             );
 
             let provider = CssProvider::new();
@@ -392,13 +486,316 @@ mod tests {
     }
 
     #[test]
-    fn toolbar_geometry_css_stays_theme_neutral() {
+    fn gtk_theme_resolves_toolbar_symbols_at_requested_size() {
+        if std::env::var_os("HYPRSHOT_GTK_RENDER_TEST").is_none() {
+            return;
+        }
+
+        gtk4::init().expect("GTK4 display required for symbolic icon integration");
+        gtk4::gio::resources_register_include!("compiled.gresource")
+            .expect("symbolic GResource must register");
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        let toolbar = Toolbar::new(tx.clone());
+        let display = toolbar.widget().display();
+        let theme = gtk4::IconTheme::for_display(&display);
+
+        // Repeated activations must not create any additional display-global
+        // providers or append the same hicolor resource path repeatedly.
+        assert_eq!(styled_display_registrations(&display), 1);
+        let icon_path_count = || {
+            theme
+                .resource_path()
+                .iter()
+                .filter(|path| path.as_str() == ICON_THEME_RESOURCE_PATH)
+                .count()
+        };
+        assert_eq!(icon_path_count(), 1);
+
+        let second_toolbar = Toolbar::new(tx.clone());
+        let third_toolbar = Toolbar::new(tx.clone());
+        assert_eq!(styled_display_registrations(&display), 1);
+        assert_eq!(icon_path_count(), 1);
+
+        for resource in [
+            ARROW_ICON,
+            ARROW_ACTIVE_ICON,
+            RECTANGLE_ICON,
+            RECTANGLE_ACTIVE_ICON,
+            TEXT_ICON,
+            TEXT_ACTIVE_ICON,
+            BLUR_ICON,
+            BLUR_ACTIVE_ICON,
+            UNDO_ICON,
+            PALETTE_ICON,
+        ] {
+            let icon_name = themed_icon_name(resource);
+            assert!(theme.has_icon(&icon_name), "GTK cannot find {icon_name}");
+        }
+
+        let image = icon_image(ARROW_ICON);
+        assert_eq!(image.storage_type(), gtk4::ImageType::IconName);
+        assert_eq!(image.pixel_size(), TOOL_ICON_SIZE);
+        assert_eq!(
+            image.icon_name().as_deref(),
+            Some("hyprshot-diagonal-arrow-symbolic")
+        );
+
+        let palette = icon_image_sized(PALETTE_ICON, PALETTE_ICON_SIZE);
+        assert_eq!(palette.storage_type(), gtk4::ImageType::IconName);
+        assert_eq!(palette.pixel_size(), PALETTE_ICON_SIZE);
+
+        let window = gtk4::Window::new();
+        toolbar.widget().set_opacity(1.0);
+        window.set_child(Some(toolbar.widget()));
+        window.present();
+        while gtk4::glib::MainContext::default().pending() {
+            gtk4::glib::MainContext::default().iteration(false);
+        }
+
+        let (_, natural_width, _, _) = toolbar.widget().measure(gtk4::Orientation::Horizontal, -1);
+        let (_, natural_height, _, _) = toolbar.widget().measure(gtk4::Orientation::Vertical, -1);
+        eprintln!("GTK toolbar natural size: {natural_width}x{natural_height}");
+        let mut child = toolbar.widget().first_child();
+        let mut button_count = 0;
+        let mut first_width = None;
+        while let Some(widget) = child {
+            let (minimum, natural, _, _) = widget.measure(gtk4::Orientation::Horizontal, -1);
+            eprintln!(
+                "GTK toolbar child {} width_request={} minimum={} natural={}",
+                widget.css_name(),
+                widget.width_request(),
+                minimum,
+                natural
+            );
+            assert!(natural >= BUTTON_SIZE, "release button was shrunk");
+            if let Some(first_width) = first_width {
+                assert_eq!(
+                    natural, first_width,
+                    "palette and tools must have equal button widths"
+                );
+            } else {
+                first_width = Some(natural);
+            }
+            button_count += 1;
+            child = widget.next_sibling();
+        }
+        assert_eq!(button_count, 6, "expected five tools and a palette button");
+        assert!(
+            (250..=285).contains(&natural_width) && (42..=55).contains(&natural_height),
+            "GTK toolbar does not preserve release-size controls"
+        );
+
+        let palette_button = toolbar
+            .widget()
+            .last_child()
+            .expect("toolbar has a palette MenuButton")
+            .downcast::<MenuButton>()
+            .expect("last toolbar child is the palette MenuButton");
+        let overlay = palette_button
+            .child()
+            .expect("palette MenuButton has an overlay")
+            .downcast::<Overlay>()
+            .expect("palette button child is the icon and indicator overlay");
+        let color_indicator = overlay.last_child().expect("overlay has color indicator");
+        assert_eq!(
+            (
+                color_indicator.width_request(),
+                color_indicator.height_request()
+            ),
+            (14, 14),
+            "palette selection indicator should be slightly larger"
+        );
+
+        let popover = palette_button.popover().expect("palette has a popover");
+        popover.popup();
+        while gtk4::glib::MainContext::default().pending() {
+            gtk4::glib::MainContext::default().iteration(false);
+        }
+        let grid = popover
+            .child()
+            .expect("popover contains swatch grid")
+            .downcast::<Grid>()
+            .expect("palette popup child is a Grid");
+        let mut child = grid.first_child();
+        let mut swatches = 0;
+        while let Some(widget) = child {
+            let button = widget
+                .clone()
+                .downcast::<Button>()
+                .expect("grid only contains color swatch buttons");
+            let (_, width, _, _) = button.measure(gtk4::Orientation::Horizontal, -1);
+            let (_, height, _, _) = button.measure(gtk4::Orientation::Vertical, -1);
+            eprintln!("GTK color swatch actual size: {width}x{height}");
+            assert_eq!(
+                (width, height),
+                (26, 26),
+                "popover color swatch not compact"
+            );
+            swatches += 1;
+            child = widget.next_sibling();
+        }
+        assert_eq!(swatches, 17, "palette must retain all available colors");
+
+        // Exercise actual GTK click handlers rather than only the pure next_tool
+        // helper; verify action delivery, active icon and toggle semantics.
+        let arrow = toolbar
+            .widget()
+            .first_child()
+            .unwrap()
+            .downcast::<Button>()
+            .unwrap();
+        let rectangle = arrow.next_sibling().unwrap().downcast::<Button>().unwrap();
+        let text = rectangle
+            .next_sibling()
+            .unwrap()
+            .downcast::<Button>()
+            .unwrap();
+        let blur = text.next_sibling().unwrap().downcast::<Button>().unwrap();
+        let undo = blur.next_sibling().unwrap().downcast::<Button>().unwrap();
+
+        arrow.emit_clicked();
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(AppAction::Screenshot(ScreenshotAction::SetTool(
+                Tool::Arrow
+            )))
+        ));
+        assert!(arrow.has_css_class(ACTIVE_TOOL_CLASS));
+        let active_arrow = arrow.child().unwrap().downcast::<Image>().unwrap();
+        assert_eq!(
+            active_arrow.icon_name().as_deref(),
+            Some("hyprshot-diagonal-arrow-active-symbolic")
+        );
+        arrow.emit_clicked();
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(AppAction::Screenshot(ScreenshotAction::SetTool(Tool::None)))
+        ));
+        assert!(!arrow.has_css_class(ACTIVE_TOOL_CLASS));
+        assert_eq!(
+            arrow
+                .child()
+                .unwrap()
+                .downcast::<Image>()
+                .unwrap()
+                .icon_name()
+                .as_deref(),
+            Some("hyprshot-diagonal-arrow-symbolic")
+        );
+
+        for (button, tool) in [
+            (&rectangle, Tool::Rectangle),
+            (&text, Tool::Text),
+            (&blur, Tool::Blur),
+        ] {
+            button.emit_clicked();
+            match rx.try_recv() {
+                Ok(AppAction::Screenshot(ScreenshotAction::SetTool(received))) => {
+                    assert_eq!(received, tool);
+                }
+                _ => panic!("clicked tool did not send SetTool"),
+            }
+            assert!(button.has_css_class(ACTIVE_TOOL_CLASS));
+        }
+        undo.emit_clicked();
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(AppAction::Screenshot(ScreenshotAction::Undo))
+        ));
+
+        let black = grid.child_at(3, 3).unwrap().downcast::<Button>().unwrap();
+        black.emit_clicked();
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(AppAction::Screenshot(ScreenshotAction::SetColor(0, 0, 0)))
+        ));
+        while gtk4::glib::MainContext::default().pending() {
+            gtk4::glib::MainContext::default().iteration(false);
+        }
+        assert!(!popover.is_visible(), "color click must dismiss popup");
+
+        popover.popup();
+        let white = grid.child_at(0, 4).unwrap().downcast::<Button>().unwrap();
+        white.emit_clicked();
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(AppAction::Screenshot(ScreenshotAction::SetColor(
+                255, 255, 255
+            )))
+        ));
+        while gtk4::glib::MainContext::default().pending() {
+            gtk4::glib::MainContext::default().iteration(false);
+        }
+        assert!(
+            !popover.is_visible(),
+            "second color click must dismiss popup"
+        );
+
+        // Tear down the first editor while another toolbar stays mounted:
+        // the shared CSS/icon resources must still work, with no new registration.
+        let second_window = gtk4::Window::new();
+        second_toolbar.widget().set_opacity(1.0);
+        second_window.set_child(Some(second_toolbar.widget()));
+        second_window.present();
+        while gtk4::glib::MainContext::default().pending() {
+            gtk4::glib::MainContext::default().iteration(false);
+        }
+        window.close();
+        drop(toolbar);
+        drop(third_toolbar);
+        while gtk4::glib::MainContext::default().pending() {
+            gtk4::glib::MainContext::default().iteration(false);
+        }
+        assert_eq!(styled_display_registrations(&display), 1);
+        assert_eq!(icon_path_count(), 1);
+        let (_, second_width, _, _) = second_toolbar
+            .widget()
+            .measure(gtk4::Orientation::Horizontal, -1);
+        assert_eq!(second_width, natural_width);
+        assert!(theme.has_icon("hyprshot-diagonal-arrow-symbolic"));
+        second_window.close();
+    }
+
+    #[test]
+    fn toolbar_named_symbolic_icons_have_the_expected_resource_identity() {
+        for resource in [
+            ARROW_ICON,
+            ARROW_ACTIVE_ICON,
+            RECTANGLE_ICON,
+            RECTANGLE_ACTIVE_ICON,
+            TEXT_ICON,
+            TEXT_ACTIVE_ICON,
+            BLUR_ICON,
+            BLUR_ACTIVE_ICON,
+            UNDO_ICON,
+            PALETTE_ICON,
+        ] {
+            let name = themed_icon_name(resource);
+            assert!(name.starts_with("hyprshot-"));
+            assert!(name.ends_with("-symbolic"));
+        }
+
+        assert_eq!(TOOL_ICON_SIZE, 24);
+        assert_eq!(PALETTE_ICON_SIZE, 28);
+    }
+
+    #[test]
+    fn toolbar_geometry_css_restores_compact_theme_aware_button_group() {
         let css = toolbar_geometry_css();
 
+        assert_eq!(BUTTON_SIZE, 36);
+        assert_eq!(COLOR_INDICATOR_SIZE, 14);
         assert!(css.contains("border-radius: 10px"));
         assert!(css.contains("padding: 4px"));
-        assert!(!css.contains("background"));
-        assert!(!css.contains("color:"));
+        assert!(css.contains("background-image: none"));
+        assert!(css.contains("background-color: rgba(231, 235, 239, 0.97)"));
+        assert!(css.contains("mix(@theme_bg_color, @theme_fg_color, 0.07)"));
+        assert!(css.contains("background-color: rgba(244, 247, 250, 0.98)"));
+        assert!(css.contains(".hyprshot-toolbar > menubutton > button"));
+        assert!(css.contains(".hyprshot-toolbar > button.suggested-action"));
+        assert!(css.contains("min-width: 26px"));
+        assert!(css.contains("min-height: 30px"));
     }
 
     #[test]

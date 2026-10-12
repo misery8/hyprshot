@@ -1,3 +1,3 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-  <rect x="4" y="6" width="16" height="12" rx="0.75" fill="none" stroke="#ffffff" stroke-width="2.25"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <path d="M4.75 6H19.25Q20 6 20 6.75V17.25Q20 18 19.25 18H4.75Q4 18 4 17.25V6.75Q4 6 4.75 6Z" class="transparent-fill foreground-stroke" fill="none" stroke="#ffffff" stroke-width="2.25"/>
 </svg>
